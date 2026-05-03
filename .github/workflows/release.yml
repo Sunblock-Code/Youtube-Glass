@@ -19,10 +19,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # No cache: 'npm' — package-lock.json is gitignored, so the cache
+          # action would fail to find a lock file. Plain `npm install` below.
 
       - name: Install dependencies
-        run: npm ci || npm install
+        # `npm install` (not `npm ci`) since package-lock.json is gitignored.
+        run: npm install
 
       - name: Build icon
         run: npm run build:icon
