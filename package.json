@@ -2,19 +2,81 @@
   "name": "youtube-glass",
   "version": "0.1.0",
   "description": "Glassmorphic YouTube frontend (Piped backend) with built-in ad/tracker blocking",
+  "author": "Sunblock-Code",
+  "license": "MIT",
+  "homepage": "https://github.com/Sunblock-Code/Youtube-Glass",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sunblock-Code/Youtube-Glass.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "prestart": "node scripts/build-icon.js",
-    "build:icon": "node scripts/build-icon.js"
+    "build:icon": "node scripts/build-icon.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "devDependencies": {
     "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
     "sharp": "^0.33.5",
     "to-ico": "^1.1.5"
   },
   "dependencies": {
     "dashjs": "^4.7.4",
     "hls.js": "^1.5.13"
+  },
+  "build": {
+    "appId": "com.glass.youtube",
+    "productName": "Glass",
+    "copyright": "Copyright © 2026 Sunblock-Code",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "!**/*.{md,map}",
+      "!.git",
+      "!.gitignore",
+      "!.vscode",
+      "!.idea",
+      "!dist",
+      "!build",
+      "!scripts/build-icon.js",
+      "!yt-dlp.exe",
+      "!glass-*.json",
+      "!google-auth.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Glass",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Sunblock-Code",
+      "repo": "Youtube-Glass"
+    }
   }
 }

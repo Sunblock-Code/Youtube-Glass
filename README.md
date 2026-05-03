@@ -55,6 +55,22 @@ Tokens are stored at `%APPDATA%\youtube-glass\google-auth.json`. To disconnect, 
 - **Adblock list** — extend `AD_DOMAINS` / `AD_PATTERNS` in [adblock.js](adblock.js).
 - **Theme** — CSS variables at the top of [renderer/styles.css](renderer/styles.css) drive every color.
 
+## Building installers
+
+Glass uses [`electron-builder`](https://www.electron.build/) to produce a Windows installer (NSIS) and a portable `.exe`.
+
+```bash
+npm install
+npm run dist           # build NSIS installer + portable .exe to dist/
+npm run pack           # quick directory build for testing (no installer)
+```
+
+Output appears in `dist/`:
+- `Glass-<version>-x64.exe` — installer (lets the user pick install path, creates Start Menu + Desktop shortcuts)
+- `Glass-<version>-x64-portable.exe` — single-file portable build, no install required
+
+Releases are also auto-built on GitHub. Push a tag like `v0.1.0` and the [release workflow](.github/workflows/release.yml) builds and attaches the installer + portable to a GitHub Release. The icon is generated from `assets/icon.svg` via the existing `build:icon` script.
+
 ## Caveats
 
 - yt-dlp itself updates often to keep pace with YouTube changes. To upgrade it, delete `%APPDATA%\youtube-glass\yt-dlp.exe` and click *Install yt-dlp* again.
