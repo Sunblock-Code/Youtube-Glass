@@ -1,0 +1,4198 @@
+:root {
+  /* User-tweakable via Settings */
+  --blur: 20px;
+  --glass-alpha: 0.05;
+  --glass-strong-alpha: 0.09;
+  --bg-opacity: 1;
+
+  --bg: #0a0612;
+  --glass: rgba(255, 255, 255, var(--glass-alpha));
+  --glass-strong: rgba(255, 255, 255, var(--glass-strong-alpha));
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --text: #ece6ff;
+  --muted: #9b94b3;
+  --accent: #c084fc;
+  --accent-soft: rgba(192, 132, 252, 0.18);
+
+  --blob-1: #8b5cf6;
+  --blob-2: #ec4899;
+  --blob-3: #3b82f6;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+
+body {
+  font-family: "Segoe UI Variable", "Segoe UI", -apple-system, system-ui, sans-serif;
+  color: var(--text);
+  /* Transparent so the BrowserWindow (transparent:true) lets the desktop
+     show through wherever the .bg gradient is faded out via --bg-opacity. */
+  background: transparent;
+  display: grid;
+  grid-template-rows: 56px auto 1fr;
+  -webkit-font-smoothing: antialiased;
+}
+:root[data-material="mica"]    .titlebar,
+:root[data-material="acrylic"] .titlebar,
+:root[data-material="tabbed"]  .titlebar { background: rgba(10, 6, 18, 0.35); }
+
+/* --- Global scrollbar styling (works on horizontal AND vertical) --- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-color: rgba(255, 255, 255, 0.18) transparent; scrollbar-width: thin; }
+
+/* Hide scrollbars (but keep scroll behavior) when toggled on in Settings */
+:root[data-scrollbars="hidden"] *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+:root[data-scrollbars="hidden"] * { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Hide Proton Pass button when toggled off in Settings */
+:root[data-passbtn="hidden"] #pass-btn { display: none !important; }
+
+/* Hide donate button when toggled off in Settings (requires typing the
+   phrase). The hate-text confirmation lives in the Theme tab. */
+:root[data-donate="hidden"] #donate-btn { display: none !important; }
+
+/* --- Background gradient + blobs ---
+   Sits above body's solid colour but BELOW interactive content via explicit
+   positioning of titlebar/banner/main rather than relying on negative z-index
+   (which doesn't always stack reliably on Electron/Windows). */
+.bg {
+  position: fixed; inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 0% 0%, #2a0a3e 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, #0a1f3a 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, #1a0a3e 0%, transparent 65%),
+    linear-gradient(180deg, #0a0612 0%, #050309 100%);
+  background-size: 220% 220%, 220% 220%, 240% 220%, 100% 100%;
+  background-position: 0% 0%, 100% 0%, 50% 100%, 0% 0%;
+  opacity: var(--bg-opacity);
+  transition: opacity 0.25s ease;
+  animation: bgFlow 28s ease-in-out infinite;
+}
+@keyframes bgFlow {
+  0%, 100% { background-position: 0% 0%, 100% 0%, 50% 100%, 0% 0%; }
+  25%      { background-position: 25% 30%, 75% 20%, 30% 80%, 0% 0%; }
+  50%      { background-position: 50% 60%, 50% 50%, 70% 60%, 0% 0%; }
+  75%      { background-position: 25% 30%, 80% 70%, 40% 90%, 0% 0%; }
+}
+/* Paint everything else on top of .bg */
+.titlebar, #banner, main { position: relative; z-index: 1; }
+/* #modal stays position: fixed (set in .modal class). It needs a high z-index
+   to render above everything but must not get position:relative — otherwise it
+   joins the document flow and gets pushed below the main view instead of
+   centering on the viewport. */
+#modal { z-index: 100; }
+.blob {
+  position: absolute; border-radius: 50%;
+  /* Mica-style: light blooms through frosted glass instead of flat translucency.
+     `mix-blend-mode: screen` brightens whatever's behind, so the colour reads
+     as luminous rather than as a coloured film. */
+  filter: blur(80px) saturate(140%);
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: float 22s ease-in-out infinite;
+  will-change: transform;
+}
+.b1 { background: var(--blob-1); width: 520px; height: 520px; top: -160px; left: -160px; }
+.b2 { background: var(--blob-2); width: 420px; height: 420px; bottom: -120px; right: -120px; animation-delay: -7s; }
+.b3 { background: var(--blob-3); width: 360px; height: 360px; top: 35%; left: 45%; animation-delay: -14s; opacity: 0.4; }
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%      { transform: translate(80px, -50px) scale(1.08); }
+  50%      { transform: translate(40px, 60px)  scale(0.94); }
+  75%      { transform: translate(-60px, -30px) scale(1.06); }
+}
+
+/* Subtle, fine-grain noise overlay for the acrylic feel */
+.bg::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.45'/></svg>");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+  opacity: 0.10;
+}
+
+/* Background motion variants */
+:root[data-motion="still"] .blob,
+:root[data-motion="still"] .bg { animation: none; }
+
+/* Solid background mode — flat colour, no gradient/blobs/noise/animation */
+:root[data-bgmode="solid"] .bg {
+  background: var(--bg-solid, #0a0612);
+  animation: none;
+}
+:root[data-bgmode="solid"] .bg::after { display: none; }
+:root[data-bgmode="solid"] .blob { display: none; }
+
+/* Frosted glass material — purely a renderer effect (no OS backdrop). Adds a
+   heavy blur+saturate to the .bg and pushes glass surfaces to a more pronounced
+   crystalline look. Pair with the See-through slider for genuine see-through. */
+:root[data-material="frosted"] .bg {
+  filter: blur(40px) saturate(180%) brightness(1.05);
+  transform: scale(1.05);   /* hide the blur clipping at edges */
+}
+:root[data-material="frosted"] .bg::after {
+  opacity: 0.04;
+}
+:root[data-material="frosted"] .titlebar,
+:root[data-material="frosted"] .modal-card {
+  backdrop-filter: blur(calc(var(--blur) + 18px)) saturate(160%);
+  -webkit-backdrop-filter: blur(calc(var(--blur) + 18px)) saturate(160%);
+  background: rgba(255, 255, 255, calc(var(--glass-alpha) + 0.04));
+}
+
+/* Subtle (default) — base values above */
+
+/* Lively — faster blob drift, faster gradient flow */
+:root[data-motion="lively"] .blob { animation-duration: 9s; }
+:root[data-motion="lively"] .b1   { animation-duration: 8s; }
+:root[data-motion="lively"] .b2   { animation-duration: 11s; }
+:root[data-motion="lively"] .bg   { animation-duration: 12s; }
+
+/* Card glow on hover */
+:root[data-glow="true"] .card:hover {
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 0 32px var(--accent-soft),
+    0 12px 30px rgba(0, 0, 0, 0.3);
+  border-color: var(--accent);
+}
+:root[data-glow="true"] .card { transition: transform 0.2s ease, background 0.2s, border-color 0.2s, box-shadow 0.25s; }
+
+/* --- Titlebar --- */
+.titlebar {
+  -webkit-app-region: drag;
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 0 16px;
+  padding-right: 160px; /* leave room for native window controls */
+  height: 56px;
+  background: rgba(10, 6, 18, 0.85);
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.55);
+  position: relative;
+  z-index: 10;
+}
+.titlebar > * { -webkit-app-region: no-drag; }
+
+.brand {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; font-size: 15px; letter-spacing: 0.5px;
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.brand:hover { background: var(--glass); }
+.brand:active { transform: scale(0.97); }
+.brand .logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border-radius: 9px;
+  box-shadow: 0 2px 14px rgba(192, 132, 252, 0.45);
+  flex-shrink: 0;
+}
+.brand .logo svg {
+  width: 18px; height: 18px;
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+}
+.brand .brand-text {
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  text-transform: uppercase;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  line-height: 1;
+  color: #e9d5ff;                       /* solid lavender — sharp at any size */
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  padding-right: 4px;
+  padding-top: 2px;                     /* optical centering vs logo */
+  /* Static layered glow underneath; the animation only varies a single
+     drop-shadow filter (GPU-composited, no paint stutter). */
+  text-shadow:
+    0 0 10px rgba(216, 180, 254, 0.45),
+    0 0 26px rgba(168,  85, 247, 0.25);
+  will-change: filter;
+  animation: brandGlow 5s ease-in-out infinite;
+}
+@keyframes brandGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.30)); }
+  50%      { filter: drop-shadow(0 0 12px rgba(216, 180, 254, 0.65)); }
+}
+
+/* Allow brand to be wider since it now needs more room */
+.titlebar { grid-template-columns: auto auto 1fr auto; }
+.brand { padding: 4px 8px; gap: 11px; }
+
+.back-btn {
+  -webkit-app-region: no-drag;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  /* No box at rest — just the chevron. The button still keeps its hit area
+     so it remains clickable; background only appears on hover. */
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.18s, opacity 0.2s;
+}
+.back-btn:hover:not(:disabled) {
+  background: var(--glass);
+  border-color: var(--glass-border);
+  color: var(--accent);
+  transform: translateX(-2px);
+}
+.back-btn:active:not(:disabled) { transform: translateX(-2px) scale(0.94); }
+.back-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.search-wrap {
+  position: relative;
+  max-width: 600px;
+  width: 100%;
+  justify-self: center;
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  transition: color 0.2s, transform 0.2s;
+  z-index: 1;
+}
+.search-hint {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  font: 600 10px "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 7px;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 1;
+}
+#search {
+  width: 100%; height: 40px;
+  padding: 0 80px 0 42px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, calc(var(--glass-alpha) * 1.4));
+  color: var(--text);
+  outline: none;
+  font: inherit; font-size: 14px;
+  backdrop-filter: blur(calc(var(--blur) * 1.2)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--blur) * 1.2)) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.3s;
+}
+#search::placeholder { color: var(--muted); transition: color 0.2s, opacity 0.2s; }
+.search-wrap:hover #search:not(:focus) {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-strong);
+}
+.search-wrap:focus-within .search-icon {
+  color: var(--accent);
+  transform: translateY(-50%) scale(1.05);
+}
+.search-wrap:focus-within .search-hint {
+  opacity: 0;
+  transform: translateY(-50%) translateX(8px);
+}
+#search:focus {
+  border-color: var(--accent);
+  background: var(--glass-strong);
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    0 8px 24px rgba(192, 132, 252, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+#search:focus::placeholder { color: rgba(192, 132, 252, 0.5); }
+
+/* Search shape variant: soft square */
+:root[data-search="square"] #search { border-radius: 12px; }
+:root[data-search="square"] .search-hint { border-radius: 6px; }
+
+.topnav { display: flex; gap: 4px; }
+.topnav button {
+  height: 36px; padding: 0 16px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted); cursor: pointer;
+  font: inherit; font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  transition: all 0.15s;
+}
+.topnav .icon-btn { letter-spacing: 0; }
+.topnav button:hover {
+  color: var(--text);
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+
+/* Subs / Shorts / History — display mode toggle (Theme tab).
+   The default (data-topnav="text") leaves the existing text-only look. */
+.topnav button[data-route] { display: inline-flex; align-items: center; gap: 8px; }
+.topnav button[data-route] .topnav-icon { display: none; flex-shrink: 0; }
+
+:root[data-topnav="icon"] .topnav button[data-route] {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+:root[data-topnav="icon"] .topnav button[data-route] .topnav-icon { display: inline-block; }
+:root[data-topnav="icon"] .topnav button[data-route] .topnav-label { display: none; }
+
+:root[data-topnav="both"] .topnav button[data-route] .topnav-icon { display: inline-block; }
+:root[data-topnav="both"] .topnav button[data-route] { padding: 0 14px; }
+.topnav button.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.35);
+}
+.topnav .icon-btn { width: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Donate button — pink-tinted gradient pill with a gentle heart pulse */
+.topnav .donate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 0 12px;
+  background: linear-gradient(135deg,
+    rgba(244, 114, 182, 0.18),
+    rgba(236, 72,  153, 0.10));
+  border-color: rgba(244, 114, 182, 0.35);
+  color: #fbcfe8;
+}
+.topnav .donate-btn:hover {
+  background: linear-gradient(135deg,
+    rgba(244, 114, 182, 0.30),
+    rgba(236, 72,  153, 0.18));
+  border-color: rgba(244, 114, 182, 0.65);
+  color: #fff;
+}
+.donate-heart {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.6));
+  animation: donateBeat 1.6s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes donateBeat {
+  0%, 60%, 100% { transform: scale(1); }
+  10%           { transform: scale(1.18); }
+  20%           { transform: scale(0.96); }
+  30%           { transform: scale(1.10); }
+  40%           { transform: scale(1); }
+}
+
+/* --- Main scroll ---
+   Padding-left/right has to be ≥ the card hover glow radius (32px). With less,
+   the leftmost / rightmost cards get their accent bloom clipped against main's
+   content box because `overflow-y: auto` forces `overflow-x` to behave as
+   `auto` (CSS spec) — the only-visible glow axis is then no longer visible. */
+main {
+  overflow-y: auto;
+  padding: 24px 40px 40px;
+}
+main::-webkit-scrollbar { width: 10px; }
+main::-webkit-scrollbar-track { background: transparent; }
+main::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); background-clip: content-box; }
+
+.section-title {
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--muted); margin: 0 0 16px;
+}
+
+/* --- Video grid --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+/* --- Shorts page tabs --- */
+.shorts-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.shorts-tab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px 12px;
+  position: relative;
+  transition: color 0.15s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.shorts-tab:hover { color: var(--text); }
+.shorts-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* --- Shorts grid (vertical aspect-ratio cards) --- */
+.shorts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.shorts-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: transform 0.2s ease, background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.shorts-card:hover {
+  transform: translateY(-3px);
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+.shorts-thumb {
+  width: 100%;
+  aspect-ratio: 9/16;
+  background: #1a1326;
+  position: relative;
+  overflow: hidden;
+}
+.shorts-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shorts-thumb .duration {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+}
+.shorts-badge {
+  position: absolute; top: 8px; left: 8px;
+  background: linear-gradient(135deg, #ef4444, #ec4899);
+  color: white;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.shorts-meta { padding: 10px 12px 12px; }
+.shorts-meta .title {
+  font-size: 13px; font-weight: 600;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.35;
+}
+.shorts-meta .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: transform 0.2s ease, background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+  transform: translateY(-3px);
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.card .thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #1a1326;
+  position: relative;
+  overflow: hidden;
+}
+.card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .thumb .duration {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  backdrop-filter: blur(4px);
+}
+/* Hide the duration pill entirely if it has no value (was rendering as a tiny
+   empty black rectangle on videos where the API didn't include duration). */
+.thumb .duration:empty { display: none; }
+
+.card .meta { padding: 12px 14px 14px; }
+.card .title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.card .sub { font-size: 12px; color: var(--muted); }
+
+/* --- Watch page --- */
+.player-page {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) var(--related-width, 380px);
+  gap: 20px;
+  transition: grid-template-columns 0.3s ease;
+  align-items: start;
+}
+/* Cap the centre column so it doesn't go to absurd widths on ultrawides */
+.player-page > .player-col {
+  max-width: 1280px;
+  width: 100%;
+  justify-self: start;
+  min-width: 0;
+}
+
+/* Both side panels are sticky with their own internal scroll. Use a fixed
+   height (not max-height) so the panel always fills the viewport — otherwise
+   it sizes to its content and the bottom rows get pushed off-screen as soon
+   as the player column grows past the panel's intrinsic height. */
+.player-page > .related-col,
+.player-page > .comments-col {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.player-page > .related-col .related,
+.player-page > .comments-col .comments-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  /* Don't bubble wheel events to the page — keeps the side panels' positions
+     and scroll state stable when the user scrolls the description / video. */
+  overscroll-behavior: contain;
+}
+
+/* Collapsed states — sidebars become 28px slivers flush to the window edges */
+.player-page.related-collapsed  { grid-template-columns: 320px minmax(0, 1fr) 28px; }
+.player-page.comments-collapsed { grid-template-columns: 28px minmax(0, 1fr) var(--related-width, 380px); }
+.player-page.comments-collapsed.related-collapsed {
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+}
+
+/* Tab-styling for the collapsed sliver — only when the column is actually
+   on the SIDE (related is always; comments only when commentsPlacement=side
+   AND window is wide enough). Below-mode collapse uses dropdown styling
+   instead, defined further down. */
+.player-page.related-collapsed > .related-col,
+.player-page.comments-collapsed:not([data-cmode-below]) > .comments-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to left, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  padding: 0;
+  height: calc(100vh - 80px);
+  min-height: 110px;
+}
+
+.player-page.related-collapsed > .related-col {
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  /* Extend past main's 40px right padding so the sliver sits flush against
+     the window's right edge — same trick on the left for the comments tab. */
+  margin-right: -40px;
+  background: linear-gradient(to left, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
+  box-shadow:
+    -6px 0 24px rgba(0, 0, 0, 0.45),
+    inset -1px 0 0 rgba(255, 255, 255, 0.06);
+}
+.player-page.related-collapsed > .related-col:hover {
+  background: linear-gradient(to left, rgba(192, 132, 252, 0.22), rgba(20, 12, 30, 0.65));
+  border-color: rgba(192, 132, 252, 0.45);
+}
+
+.player-page.comments-collapsed:not([data-cmode-below]) > .comments-col {
+  border-left: none;
+  border-radius: 0 16px 16px 0;
+  margin-left: -40px;     /* clear main's 40px left padding → flush to window edge */
+  background: linear-gradient(to right, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
+  box-shadow:
+    6px 0 24px rgba(0, 0, 0, 0.45),
+    inset 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+.player-page.comments-collapsed:not([data-cmode-below]) > .comments-col:hover {
+  background: linear-gradient(to right, rgba(192, 132, 252, 0.22), rgba(20, 12, 30, 0.65));
+  border-color: rgba(192, 132, 252, 0.45);
+}
+
+/* --- BELOW-MODE DROPDOWN (when comments lives below the player) ---
+   Triggered when commentsPlacement is "below" OR "auto" at narrow widths.
+   Renders as a clean clickable banner under the description. */
+/* Layout fix: when below-mode is active, restructure the grid so Up next
+   spans both rows on the right and comments sits IMMEDIATELY under the
+   player column, instead of in a separate row stretched to up-next height. */
+.player-page[data-cmode-below] {
+  grid-template-rows: auto auto;
+  /* row-gap 0 so the comments-col margin-top is the only spacing between the
+     description and the comments dropdown — matches channel-row → desc gap */
+  row-gap: 0;
+}
+.player-page[data-cmode-below] > .player-col   { grid-row: 1; grid-column: 1; }
+.player-page[data-cmode-below] > .comments-col { grid-row: 2; grid-column: 1; align-self: start; }
+.player-page[data-cmode-below] > .related-col  { grid-row: 1 / span 2; grid-column: 2; }
+
+/* Below-description comments panel — its OWN look, modeled exactly on
+   .channel-row: same glass background, border, 14px radius, blur, and same
+   width (full player-col width up to 1280px, left-aligned). Distinct from
+   the side tabs (left & right), which keep their edge-flush sliver style. */
+.player-page[data-cmode-below] > .comments-col {
+  height: auto !important;
+  max-height: none !important;
+  position: static !important;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  margin-top: 16px;
+  overflow: hidden;
+  width: 100%;
+  max-width: 1280px;
+  justify-self: start;
+  box-sizing: border-box;
+}
+/* Collapsed below-mode dropdown: match .channel-row dimensions exactly —
+   glass pill with 12px/16px padding, ~60px tall, label + chevron sit inline. */
+.player-page.comments-collapsed[data-cmode-below] > .comments-col {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0 !important;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.player-page.comments-collapsed[data-cmode-below] > .comments-col:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+.player-page.comments-collapsed[data-cmode-below] > .comments-col .comments-header {
+  display: flex !important;
+  width: 100%;
+  padding: 12px 16px;
+  margin: 0;
+  align-items: center;
+  justify-content: center;     /* label centered inside the pill, not flush-left */
+  gap: 14px;
+}
+.player-page.comments-collapsed[data-cmode-below] > .comments-col .comments-header .section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+.player-page.comments-collapsed[data-cmode-below] > .comments-col .comments-header .section-title::before {
+  content: '▾';
+  color: var(--accent);
+  font-size: 14px;
+  display: inline-block;
+}
+.player-page.comments-collapsed[data-cmode-below] > .comments-col #comments-toggle {
+  display: none;
+}
+
+/* When collapsed, the header just centres the chevron in the tab */
+.player-page.related-collapsed .related-header,
+.player-page.comments-collapsed .comments-header {
+  margin: 0;
+}
+
+/* Chevron lives inside the tab itself — no separate button frame, just the
+   icon centred in the banner. The tab as a whole is the visual "button". */
+.player-page.related-collapsed #related-toggle,
+.player-page.comments-collapsed #comments-toggle {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+  border-radius: 0;
+}
+.player-page.related-collapsed #related-toggle svg,
+.player-page.comments-collapsed #comments-toggle svg {
+  width: 18px; height: 18px;
+}
+.player-page.related-collapsed > .related-col:hover #related-toggle,
+.player-page.comments-collapsed > .comments-col:hover #comments-toggle {
+  color: white;
+  background: transparent;
+}
+
+.player-page.related-collapsed .related-header .section-title { display: none; }
+.player-page.related-collapsed .related { display: none; }
+.player-page.related-collapsed #related-layout { display: none !important; }
+.player-page.related-collapsed .related-header { justify-content: center; }
+.player-page.related-collapsed #related-toggle svg { transform: rotate(180deg); }
+
+.player-page.comments-collapsed .comments-header .section-title { display: none; }
+.player-page.comments-collapsed .comments-list { display: none; }
+/* Also hide the composer + filters when the comments column is collapsed —
+   otherwise the textarea ("Add a comment...") and Top/New/etc. pills try to
+   render inside the 28px sliver and end up as the squished half-cards the
+   user sees behind the toggle chevron. */
+.player-page.comments-collapsed .comment-composer { display: none; }
+.player-page.comments-collapsed .comment-filters  { display: none; }
+/* Comments collapse uses left-pointing chevron; expanded → "<", collapsed → ">"  */
+.player-page:not(.comments-collapsed) #comments-toggle svg { transform: rotate(0deg); }
+.player-page.comments-collapsed     #comments-toggle svg { transform: rotate(180deg); }
+
+@media (max-width: 1700px) {
+  .player-page { grid-template-columns: minmax(0, 1fr) 380px; }
+  .player-page.related-collapsed { grid-template-columns: minmax(0, 1fr) 36px; }
+  .player-page.comments-collapsed { grid-template-columns: minmax(0, 1fr) 380px; }
+  .player-page.comments-collapsed.related-collapsed { grid-template-columns: minmax(0, 1fr) 36px; }
+  /* Drop comments under the player when the window is anything less than
+     genuinely-wide, in BOTH auto and side modes. Without this, side mode
+     leaves a tall comments column on the left of a much shorter video,
+     so the whole right side of the screen below the description ends up
+     as dead space — what the user reported. */
+  :root[data-comments="auto"]  .player-page > .comments-col,
+  :root[data-comments="side"]  .player-page > .comments-col {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+    height: auto;
+    max-height: none;
+    margin-top: 18px;
+    border-top: 1px solid var(--glass-border);
+    padding-top: 14px;
+    min-width: 0;
+    align-self: start;
+  }
+  :root[data-comments="auto"]  .player-page > .comments-col .comments-list,
+  :root[data-comments="side"]  .player-page > .comments-col .comments-list {
+    overflow-y: visible;
+    max-height: none;
+  }
+  :root[data-comments="auto"]  .player-page.comments-collapsed > .comments-col,
+  :root[data-comments="side"]  .player-page.comments-collapsed > .comments-col {
+    max-height: 50px;
+    margin-top: 12px;
+  }
+}
+@media (max-width: 1100px) {
+  .player-page { grid-template-columns: 1fr; }
+  .player-page > .player-col { max-width: none; }
+  .player-page > .related-col {
+    position: static;
+    height: auto;
+    max-height: none;
+  }
+  .player-page > .related-col .related { overflow-y: visible; }
+  /* Make sure the comments column also goes static + full-width when both
+     side panels collapse into the single column. */
+  .player-page > .comments-col {
+    grid-column: 1;
+    position: static;
+    height: auto;
+    max-height: none;
+  }
+}
+
+/* --- Comments placement overrides (Settings) --- */
+/* Force "side" — keep 3-col layout even at narrow widths, just like Up next */
+:root[data-comments="side"] .player-page {
+  grid-template-columns: 320px minmax(0, 1fr) var(--related-width, 380px);
+}
+:root[data-comments="side"] .player-page.comments-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) var(--related-width, 380px);
+}
+:root[data-comments="side"] .player-page.comments-collapsed.related-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+:root[data-comments="side"] .player-page.related-collapsed:not(.comments-collapsed) {
+  grid-template-columns: 320px minmax(0, 1fr) 44px;
+}
+:root[data-comments="side"] .player-page > .comments-col {
+  grid-column: auto;
+  grid-row: auto;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 80px);
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+:root[data-comments="side"] .player-page.comments-collapsed .comments-header {
+  justify-content: center;
+}
+
+/* Force "below" — comments always below player */
+:root[data-comments="below"] .player-page {
+  grid-template-columns: minmax(0, 1fr) var(--related-width, 380px);
+}
+:root[data-comments="below"] .player-page.related-collapsed {
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+/* Below-mode column placement only — visual styling is owned by the
+   .player-page[data-cmode-below] > .comments-col rules further up so the
+   dropdown matches .channel-row exactly. The old border-top / padding-top /
+   max-height clamps used to live here and were beating those rules on
+   specificity, leaving the dropdown visibly narrower / mis-shaped. */
+:root[data-comments="below"] .player-page > .comments-col {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+/* --- Comments panel --- */
+.comments-header {
+  display: flex;
+  align-items: center;
+  margin: 0 0 14px;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: transparent;
+  padding: 6px 0 10px;
+}
+/* Below-description dropdown owns its own header layout — keep it static. */
+.player-page[data-cmode-below] > .comments-col .comments-header {
+  position: static;
+  padding: 0;
+  margin: 0;
+}
+.comments-header .section-title,
+.related-header  .section-title {
+  margin: 0;
+  flex: 1;
+  /* Glass wordmark styling — same lavender-glow treatment as the GLASS
+     titlebar text, just smaller. Static layered glow + a subtle filter
+     animation for a soft pulse. */
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  line-height: 1;
+  color: #e9d5ff;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  text-shadow:
+    0 0 8px  rgba(216, 180, 254, 0.45),
+    0 0 20px rgba(168,  85, 247, 0.22);
+  will-change: filter;
+  animation: brandGlow 5s ease-in-out infinite;
+}
+
+/* Comment composer — Piped is read-only so this drafts text in-app, copies
+   to clipboard, then opens the video on youtube.com for posting. */
+.comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.comment-composer:focus-within,
+.comment-composer.active {
+  border-color: var(--accent);
+  background: var(--glass-strong);
+}
+.comment-composer textarea {
+  width: 100%;
+  min-height: 26px;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  padding: 2px 0;
+}
+.comment-composer textarea::placeholder { color: var(--muted); }
+.comment-composer-actions {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.comment-composer.active .comment-composer-actions { display: flex; }
+.comment-composer-hint {
+  flex: 1;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+  min-width: 140px;
+}
+.comment-composer-hint.signed-in { color: #a8e6a3; }
+.comment-composer-actions button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+/* Rounded-square shape, matched sizing for both buttons. The Comment
+   primary button uses the accent color directly (cleaner than the
+   purple-pink mix); Cancel is a subtle ghost button with a soft tint. */
+.comment-composer-actions button {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s,
+              transform 0.12s, box-shadow 0.2s;
+}
+.comment-composer-actions button:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.comment-composer-actions button:active { transform: translateY(0); }
+.comment-composer-actions button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #1a0a2e;
+  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
+}
+.comment-composer-actions button.primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 20px rgba(192, 132, 252, 0.45);
+}
+.comment-composer-actions button.primary:active {
+  filter: brightness(0.96);
+  box-shadow: 0 2px 8px rgba(192, 132, 252, 0.35);
+}
+
+/* Sort filter pills under the Comments header — also sticky, anchored just
+   under the header so they don't get covered by scrolling comment text. */
+.comment-filters {
+  display: flex;
+  gap: 6px;
+  padding: 0 0 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 44px;     /* sits below .comments-header (≈ its rendered height) */
+  z-index: 5;
+  background: transparent;
+}
+.comment-filter {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  transition: all 0.15s;
+}
+.comment-filter:hover {
+  color: var(--text);
+  background: var(--glass);
+}
+.comment-filter.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.40);
+}
+/* Hide filter row when comments panel is collapsed */
+.player-page.comments-collapsed .comment-filters { display: none; }
+
+.comment {
+  display: flex;
+  gap: 10px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.comment:last-child { border-bottom: none; }
+.comment-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.comment-body { flex: 1; min-width: 0; }
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.comment-meta strong { color: var(--text); font-weight: 600; }
+.comment-time { color: var(--muted); font-size: 11px; }
+.comment-pinned, .comment-hearted {
+  font-size: 10px; padding: 2px 6px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+}
+.comment-hearted { color: #fbcfe8; background: rgba(244,114,182,0.15); }
+.comment-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #d4cce8;
+  word-wrap: break-word;
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+.comment-stats { font-size: 11px; color: var(--muted); }
+
+.related-header {
+  display: flex;
+  align-items: center;
+  margin: 0 0 12px;
+  gap: 6px;
+  /* The .related-col itself is sticky (height: calc(100vh - 80px)) and the
+     .related list inside it owns the scroll, so the header stays at the top
+     of that column naturally. */
+  position: relative;
+  z-index: 6;
+  background: transparent;
+  padding: 12px 4px 12px;
+  flex-shrink: 0;
+}
+.related-header .section-title { margin: 0; flex: 1; }
+.related-toggle {
+  /* Rounded-square instead of full circle: cleaner, more uniform with the
+     rest of the chrome, and the square icons inside no longer have to fight
+     a circular border. */
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.related-toggle:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+}
+.related-toggle:active { transform: translateY(0); }
+.related-toggle svg {
+  width: 14px; height: 14px;
+  transition: transform 0.25s;
+}
+
+.topnav-style-btn {
+  height: 32px; padding: 0 14px;
+  border-radius: 16px;
+  /* Fixed-alpha glass — independent of the user's --glass-alpha slider so it
+     stays readable when they crank gradient/glass intensity all the way down. */
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text);
+  font: inherit; font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.topnav-style-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.topnav-style-btn.primary {
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+/* --- Dashboard --- */
+.dash-row {
+  margin-bottom: 28px;
+  position: relative;
+  /* Break out of main's horizontal padding so cards scroll flush with the
+     window edge — the fade overlay then ends at the real edge instead of
+     leaving a padded strip beyond it that looks like a sharp cut-off. */
+  margin-left: -40px;
+  margin-right: -40px;
+}
+.dash-row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 0 44px;
+}
+.dash-row-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.dash-row-titlebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.dash-row-titlebtn:hover {
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+.dash-row-titlebtn:hover .dash-row-chevron { transform: translateX(2px); color: var(--accent); }
+.dash-row-titlebtn .dash-row-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-row-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border-strong);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-row-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dash-row-avatar-fallback {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.dash-row-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s, color 0.15s;
+}
+.dash-row-actions {
+  display: flex;
+  gap: 6px;
+}
+.dash-row-edit-btn {
+  width: 30px; height: 30px;
+  border-radius: 15px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0;
+  transition: all 0.15s;
+}
+.dash-row-edit-btn:hover {
+  color: var(--text);
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+}
+.dash-row-edit-btn.danger { color: #fca5a5; }
+.dash-row-edit-btn.danger:hover {
+  color: #fbcfe8;
+  background: rgba(244,114,182,0.12);
+  border-color: rgba(244,114,182,0.4);
+}
+
+/* Outer wrapper holds the scrollable strip + the floating arrow buttons */
+.dash-row-frame {
+  position: relative;
+}
+/* Soft fade-out on the right edge so the cut-off card looks intentional */
+/* Soft gradient hint that the row continues off-screen. Single-stop linear
+   gradient (no mask shenanigans) so there are no heavy artifacts at the
+   corners — just a gentle fade aligned to the card area. */
+.dash-row-frame::before,
+.dash-row-frame::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 14px;
+  width: 70px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.dash-row-frame::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg) 0%, rgba(0, 0, 0, 0) 100%);
+}
+.dash-row-frame::after {
+  right: 0;
+  background: linear-gradient(to left,  var(--bg) 0%, rgba(0, 0, 0, 0) 100%);
+}
+.dash-row-frame.has-overflow-left::before  { opacity: 0.55; }
+.dash-row-frame.has-overflow-right::after  { opacity: 0.55; }
+
+/* Hide fade overlays whenever any card in the row is being hovered, so the
+   hover glow isn't clipped at the left/right edges. */
+.dash-row-frame:has(.card:hover)::before,
+.dash-row-frame:has(.card:hover)::after {
+  opacity: 0;
+}
+
+/* Floating round arrow buttons — sit in the row's outer rail (the negative
+   margin / scroll padding area) so they never overlap the cards. */
+.dash-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%) scale(0.92);
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border-strong);
+  background: rgba(20, 12, 30, 0.78);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s, background 0.15s, color 0.15s;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 0;
+}
+.dash-arrow svg { width: 16px; height: 16px; }
+/* Sit just inside main's padding (40px) so the arrows hover at the visible
+   edge of the cards, not over the cards themselves. */
+.dash-arrow.left  { left: 4px; }
+.dash-arrow.right { right: 4px; }
+.dash-row-frame:hover .dash-arrow.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+.dash-arrow:hover {
+  background: rgba(20, 12, 30, 0.95);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dash-arrow:active { transform: translateY(-50%) scale(0.92); }
+
+.dash-row-scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden; /* explicit so it doesn't toggle on hover */
+  /* No scroll-snap — free smooth scrolling instead of jerking to card edges. */
+  scroll-snap-type: none;
+  /* Horizontal padding restores breathing room for the first/last card after
+     the row was broken out of main's padding (negative margins above).
+     Top padding gives the card hover glow room — without it the
+     `overflow-x: auto` forces vertical clipping that cuts the top of glow. */
+  padding: 8px 40px 14px;
+  margin-top: -8px;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+  cursor: grab;
+  user-select: none;
+  /* Soft fade at the left/right edges of the scroll viewport. The mask hides
+     any sharp clip line when a card's hover glow (or rounded corner) butts up
+     against the viewport edge — they fade smoothly into transparency instead
+     of getting hard-clipped. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+}
+/* Soften card hover glow inside dashboard rows so it doesn't fight with the
+   scroll container's clipping bounds. */
+:root[data-glow="true"] .dash-row-scroll .card:hover {
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 8px 22px rgba(0, 0, 0, 0.32);
+}
+.dash-row-scroll.dragging { cursor: grabbing; scroll-behavior: auto; }
+/* Note: NOT setting pointer-events:none on .card during drag — that would
+   block ordinary (non-drag) clicks from registering. The click-suppression
+   below in JS uses the `moved > 5` heuristic to swallow only real drags. */
+.dash-row-scroll::-webkit-scrollbar { height: 6px; }
+.dash-row-scroll::-webkit-scrollbar-track { background: transparent; }
+.dash-row-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
+.dash-row-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+.dash-row-scroll .card {
+  flex: 0 0 280px;
+  scroll-snap-align: none;
+}
+
+/* --- Dashboard widgets ---
+   Flexbox layout so the wide "Recently watched" widget grows to fill any
+   horizontal space left over after the fixed-size compact widgets (clock,
+   quick links). No more dead space on the right. */
+.dash-widgets-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 4px;
+  align-items: stretch;
+}
+.dash-widget {
+  flex: 0 0 280px;          /* compact widgets — fixed width */
+  align-self: stretch;
+}
+.dash-widget[data-widget="recentHistory"] {
+  flex: 1 1 420px;          /* grow to fill remaining row width */
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .dash-widget,
+  .dash-widget[data-widget="recentHistory"] {
+    flex: 1 1 100%;
+  }
+}
+.dash-widget {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 16px 18px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.2s, border-color 0.2s;
+  /* align-self: stretch (set in the layout block above) so all widgets in
+     a row match the tallest one's height. */
+}
+.dash-widget:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+}
+.dash-widget .widget-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.dash-widget .widget-title-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+}
+.dash-widget .widget-title-row .widget-title { flex: 1; }
+.widget-more {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.widget-more:hover { text-decoration: underline; }
+
+/* Clock widget */
+.dash-widget-clock {
+  background:
+    radial-gradient(ellipse 80% 100% at 100% 0%, var(--accent-soft) 0%, transparent 70%),
+    var(--glass);
+}
+.dash-widget-clock .clock-greeting {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dash-widget-clock .clock-time {
+  font-size: 44px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0;
+}
+.dash-widget-clock .clock-time::after {
+  content: attr(data-am);
+  font-size: 14px;
+  margin-left: 8px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: var(--muted);
+  vertical-align: super;
+}
+.dash-widget-clock .clock-date {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Quick links widget */
+.widget-quicklinks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.widget-link-btn {
+  flex: 1;
+  min-width: 70px;
+  padding: 10px 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.widget-link-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* History widget — auto-fill with a CAPPED column width so cards never grow
+   into giant tiles. Single-item case no longer stretches one thumbnail edge
+   to edge; multi-item rows still adapt to the widget's width. */
+.widget-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 180px));
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: start;
+}
+@media (max-width: 720px) {
+  .widget-history-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 160px)); }
+}
+.widget-history-card {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.15s;
+}
+.widget-history-card:hover { transform: translateY(-2px); }
+.widget-history-thumb {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #1a1326;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.widget-history-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.widget-history-dur {
+  position: absolute; bottom: 4px; right: 4px;
+  background: rgba(0,0,0,0.75);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  z-index: 2;
+}
+.widget-history-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px 10px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0) 80%);
+  pointer-events: none;
+}
+.widget-history-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  width: 100%;
+}
+.widget-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 12px 0;
+}
+
+/* Widget toggles in dashboard edit mode */
+.dash-widget-toggles { margin: 0 0 18px; }
+.dash-widget-toggles-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.dash-widget-toggles-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.widget-toggle {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.widget-toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.widget-toggle input[type="checkbox"] { margin-top: 2px; }
+.widget-toggle-label { font-size: 13px; font-weight: 500; }
+.widget-toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.dash-empty {
+  background: var(--glass);
+  border: 1px dashed var(--glass-border-strong);
+  border-radius: 18px;
+  padding: 56px 24px;
+  text-align: center;
+  backdrop-filter: blur(var(--blur));
+}
+.dash-empty .title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.dash-empty .sub   { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.dash-empty button {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 20px;
+  border-radius: 19px;
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  color: white; border: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600;
+}
+.dash-empty button:hover { filter: brightness(1.08); }
+
+.dash-edit-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(192,132,252,0.30);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text);
+}
+.dash-edit-banner span { flex: 1; }
+
+/* --- Channel picker --- */
+.picker-list {
+  max-height: 360px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 12px 0 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass);
+}
+.picker-list::-webkit-scrollbar { width: 8px; }
+.picker-list::-webkit-scrollbar-track { background: transparent; }
+.picker-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.picker-list::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); background-clip: content-box; }
+.picker-list::-webkit-scrollbar-corner { background: transparent; }
+
+.picker-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--glass-border);
+  transition: background 0.12s;
+  /* override the modal-wide uppercase label styling */
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  min-width: 0;
+}
+.picker-row:last-child { border-bottom: none; }
+.picker-row:hover { background: var(--glass-strong); }
+.picker-row span {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.picker-search {
+  width: 100%;
+  height: 36px;
+  margin-bottom: 8px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit; font-size: 13px;
+  outline: none;
+}
+.picker-search:focus { border-color: var(--accent); }
+
+/* --- Custom glass checkbox (replaces default white square) --- */
+.picker-row input[type="checkbox"],
+input[type="checkbox"].glass-check {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 5px;
+  border: 1.5px solid var(--glass-border-strong);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.picker-row input[type="checkbox"]:hover,
+input[type="checkbox"].glass-check:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+.picker-row input[type="checkbox"]:checked,
+input[type="checkbox"].glass-check:checked {
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.18);
+}
+.picker-row input[type="checkbox"]:checked::after,
+input[type="checkbox"].glass-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 1px;
+  width: 5px; height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Wider modal for picker so long channel names don't trigger horizontal scroll */
+.modal-card.wide { width: 520px; }
+
+/* --- Settings modal: wide, sectioned grid, fits viewport --- */
+.modal-card.settings {
+  width: 880px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  padding: 24px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  margin: auto;     /* belt-and-braces vertical centring inside the flex parent */
+}
+/* No darkening / blur backdrop when the settings modal is open — the user
+   should see the app behind it cleanly. */
+.modal.settings-open .modal-bg,
+.modal:has(.modal-card.settings) .modal-bg {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.modal-card.settings h2 { margin: 0 0 4px; }
+.modal-card.settings .modal-sub { margin-bottom: 16px; }
+.modal-card.settings .modal-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 34px; height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  z-index: 2;
+}
+.modal-card.settings .modal-close:hover {
+  background: rgba(244, 114, 182, 0.18);
+  border-color: rgba(244, 114, 182, 0.45);
+  color: #fbcfe8;
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-right: -6px;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+@media (max-width: 760px) {
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+/* Tabbed settings layout: left tab list + right pane */
+.settings-body.settings-tabbed {
+  display: flex;
+  gap: 18px;
+  overflow: hidden;
+  padding-right: 0;
+  margin-right: 0;
+  min-height: 360px;
+}
+.settings-tabs {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 14px;
+  border-right: 1px solid var(--glass-border);
+  overflow-y: auto;
+}
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.settings-tab .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  opacity: 0.45;
+  transition: opacity 0.15s;
+  flex: 0 0 auto;
+}
+.settings-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.settings-tab.active {
+  background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(236, 72, 153, 0.10));
+  border-color: rgba(192, 132, 252, 0.40);
+  color: #fbcfe8;
+  text-shadow: 0 0 12px rgba(192, 132, 252, 0.25);
+}
+.settings-tab.active .dot { opacity: 1; }
+.settings-panes {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.settings-pane { display: none; }
+.settings-pane.active { display: block; }
+.settings-pane .settings-section { margin: 0; }
+
+.settings-section {
+  background: linear-gradient(135deg, rgba(255,255,255,0.030), rgba(255,255,255,0.005));
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  position: relative;
+}
+.settings-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.settings-section h3 {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  color: #f5f0ff;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-shadow: 0 0 12px rgba(192, 132, 252, 0.20);
+}
+.settings-section h3 .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.settings-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #e9e4ff;
+  margin: 14px 0 8px;
+}
+.settings-label .val {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.settings-label .hint,
+.pullout-grid .hint {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Compact pills inside settings sections */
+.settings-section .theme-options { gap: 5px; margin: 0 0 4px; }
+.settings-section .theme-pill {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.settings-section .theme-pill span {
+  width: 11px; height: 11px;
+}
+
+/* Sleek inline checkbox row */
+.settings-section .check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 2px;
+  cursor: pointer;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 8px 0 0;
+}
+
+/* Settings slider — full-width, fill-up track, modern thumb.
+   The background gradient is set inline via JS (setFill) on every input
+   event so the fill recomputes reliably — Chromium occasionally fails to
+   repaint custom-property-driven gradients during a drag. */
+.settings-slider {
+  display: block;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  margin: 0 0 6px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--accent);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 0 transparent,
+    0 3px 8px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(192, 132, 252, 0.40);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.settings-slider::-webkit-slider-thumb:hover {
+  box-shadow:
+    0 0 0 6px var(--accent-soft),
+    0 3px 8px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(192, 132, 252, 0.55);
+}
+.settings-slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+/* --- Tab merge / split UI --- */
+/* Tab bar shown only inside the host panel when merged */
+.panel-tab-bar {
+  display: none;
+  gap: 4px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 12px;
+  align-items: center;
+}
+/* Show tab bars in BOTH columns whenever merged — the hidden column's tab
+   bar disappears naturally because its parent is visibility: hidden. */
+.player-page[data-merged] .panel-tab-bar { display: flex; }
+
+.panel-tab {
+  flex: 1;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+.panel-tab:hover { color: var(--text); background: var(--glass); }
+.panel-tab.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.40);
+}
+.panel-tab-split {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.panel-tab-split:hover { color: var(--text); border-color: var(--glass-border-strong); }
+
+.panel-collapse {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  display: none;
+  align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.player-page[data-merged] .panel-collapse { display: inline-flex; }
+.panel-collapse:hover { color: var(--text); border-color: var(--glass-border-strong); }
+/* Chevron points toward the screen edge it'll collapse into */
+.player-page[data-merged="right"] .panel-collapse svg { transform: rotate(0deg); }
+.player-page[data-merged="left"]  .panel-collapse svg { transform: rotate(180deg); }
+
+/* --- Merged + collapsed: shrink the host column to a thin tab --- */
+.player-page.merged-collapsed[data-merged="right"] {
+  grid-template-columns: minmax(0, 1fr) 36px !important;
+}
+.player-page.merged-collapsed[data-merged="left"] {
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+}
+:root[data-comments="side"] .player-page.merged-collapsed[data-merged="left"] {
+  grid-template-columns: 36px minmax(0, 1fr) var(--related-width, 380px) !important;
+}
+.player-page.merged-collapsed .panel-tab-bar,
+.player-page.merged-collapsed .comment-filters,
+.player-page.merged-collapsed .comments-list,
+.player-page.merged-collapsed .related,
+.player-page.merged-collapsed .section-title,
+.player-page.merged-collapsed #comments-merge,
+.player-page.merged-collapsed #related-merge,
+.player-page.merged-collapsed #related-layout {
+  display: none !important;
+}
+.player-page.merged-collapsed > .comments-col,
+.player-page.merged-collapsed > .related-col {
+  cursor: pointer;
+  padding: 0 !important;
+}
+.player-page.merged-collapsed .comments-header,
+.player-page.merged-collapsed .related-header {
+  margin: 0;
+  height: 100%;
+  justify-content: center;
+}
+.player-page.merged-collapsed #comments-toggle,
+.player-page.merged-collapsed #related-toggle {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+}
+.player-page.merged-collapsed[data-merged="right"] #comments-toggle svg,
+.player-page.merged-collapsed[data-merged="right"] #related-toggle svg { transform: rotate(180deg); }
+.player-page.merged-collapsed[data-merged="left"]  #comments-toggle svg,
+.player-page.merged-collapsed[data-merged="left"]  #related-toggle svg { transform: rotate(0deg); }
+
+/* Merge handle (small button on each header) — only visible when split,
+   AND only when comments is on the side (not in below-banner mode). */
+#comments-merge, #related-merge { display: none; }
+.player-page:not([data-merged]):not([data-cmode-below]) #comments-merge,
+.player-page:not([data-merged]) #related-merge {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  /* Match .related-toggle so merge sits the same size as Layout / Collapse */
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  cursor: grab;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.player-page:not([data-merged]):not([data-cmode-below]) #comments-merge:hover,
+.player-page:not([data-merged]) #related-merge:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.player-page:not([data-merged]):not([data-cmode-below]) #comments-merge:active,
+.player-page:not([data-merged]) #related-merge:active { cursor: grabbing; }
+/* Hard hide in below-mode regardless of any other rule */
+.player-page[data-cmode-below] #comments-merge { display: none !important; }
+/* Hide merge handles when their column is collapsed — collapsed banners
+   should only contain the chevron toggle, matching each other in look. */
+.player-page.related-collapsed  #related-merge,
+.player-page.comments-collapsed #comments-merge { display: none !important; }
+
+/* In merged mode the panel-tab-bar already provides Collapse/Split buttons,
+   so the per-column chevron toggles are redundant — hide them. */
+.player-page[data-merged] #comments-toggle,
+.player-page[data-merged] #related-toggle { display: none !important; }
+
+/* MERGED layout: overlap both columns in the same grid cell */
+.player-page[data-merged="right"] {
+  grid-template-columns: minmax(0, 1fr) var(--related-width, 380px);
+}
+.player-page[data-merged="right"] > .comments-col,
+.player-page[data-merged="right"] > .related-col {
+  grid-column: 2;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: calc(100vh - 80px);
+  margin: 0;
+  border-top: none;
+  padding-top: 0;
+}
+.player-page[data-merged="right"][data-active-tab="comments"] > .related-col,
+.player-page[data-merged="right"]:not([data-active-tab="comments"]) > .comments-col {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.player-page[data-merged="left"] {
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+.player-page[data-merged="left"] > .comments-col,
+.player-page[data-merged="left"] > .related-col {
+  grid-column: 1;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: calc(100vh - 80px);
+  margin: 0;
+  border-top: none;
+  padding-top: 0;
+}
+.player-page[data-merged="left"][data-active-tab="related"] > .comments-col,
+.player-page[data-merged="left"]:not([data-active-tab="related"]) > .related-col {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Drag-and-drop visual feedback */
+body.dragging-panel { cursor: grabbing; }
+body.dragging-panel * { cursor: grabbing !important; }
+.comments-col.drop-target,
+.related-col.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(192, 132, 252, 0.10);
+}
+.comments-col[draggable="true"] .comments-header,
+.related-col[draggable="true"] .related-header { cursor: grab; }
+
+/* Pullout sub-panel grid */
+/* Use a 3-column × 3-row grid with subgrid on each cell so the title row,
+   the primary-control row, and the optional hint row line up across all
+   three columns regardless of how many rows each cell actually fills. */
+.pullout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.6fr;
+  grid-template-rows: auto auto auto;
+  row-gap: 8px;
+  column-gap: 0;
+  margin-top: 10px;
+  align-items: center;
+  text-align: center;
+}
+.pullout-grid > div {
+  display: grid;
+  grid-row: 1 / span 3;
+  grid-template-rows: subgrid;
+  align-items: center;
+  justify-items: center;
+  padding: 0 18px;
+}
+.pullout-grid > div + div {
+  border-left: 1px solid var(--glass-border);
+}
+.pullout-grid .settings-label { justify-content: center; gap: 6px; margin: 0; }
+.pullout-grid .theme-options { justify-content: center; margin: 0; }
+.pullout-grid .settings-slider { margin: 0; width: 100%; }
+.pullout-grid .hotkey-input { width: 100%; }
+.pullout-grid .hint { margin: 0; }
+@media (max-width: 760px) {
+  .pullout-grid { grid-template-columns: 1fr; }
+}
+
+/* Hotkey capture input */
+.hotkey-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit; font-size: 13px;
+  letter-spacing: 1px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.hotkey-input:focus {
+  border-color: var(--accent);
+  background: var(--glass-strong);
+  letter-spacing: 1px;
+}
+
+.player-wrap {
+  position: relative;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  aspect-ratio: 16/9;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.resume-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 8px 8px 18px;
+  background: rgba(20, 12, 30, 0.85);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 24px;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  font-size: 13px;
+  color: var(--text);
+  z-index: 5;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  animation: resumeIn 0.25s ease-out;
+}
+.resume-banner strong { color: var(--accent); font-weight: 600; margin: 0 2px; }
+.resume-banner button {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit; font-size: 12px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.resume-banner button:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
+.resume-banner button.primary {
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+.resume-banner button.primary:hover { filter: brightness(1.08); }
+.resume-banner.fading { opacity: 0; transform: translate(-50%, -8px); transition: all 0.3s; }
+@keyframes resumeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.player-wrap video { width: 100%; height: 100%; display: block; background: #000; cursor: pointer; }
+
+/* --- Custom video controls bar --- */
+.cc-bar {
+  position: absolute;
+  left: 0; right: 0;
+  /* Sit just above the progress strip — height changes from --pb-h (resting)
+     to --pb-h-hover (when the player is hovered), so the controls slide up
+     in sync with the bar instead of overlapping it. */
+  bottom: calc(var(--pb-h, 4px) + 8px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  z-index: 5;
+  /* Controls are always visible — no fade-out on play. */
+  opacity: 1;
+  transform: translateY(0);
+  transition: bottom 0.18s ease;
+  pointer-events: auto;
+}
+.player-wrap:hover .cc-bar {
+  bottom: calc(var(--pb-h-hover, 12px) + 8px);
+}
+/* Bottom darkening fade lives as a sibling element (not cc-bar::before) so
+   it can sit BELOW the progress strip in z-order — strip stays bright. */
+.player-bottom-fade {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 80px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0) 100%);
+  pointer-events: none;
+  z-index: 2;
+  /* Permanent fade so the always-visible controls remain legible. */
+  opacity: 1;
+  transition: opacity 0.22s ease;
+}
+
+.cc-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.cc-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.cc-btn:active { transform: scale(0.92); }
+
+/* Toggle play/pause icons based on state */
+#cc-play .cc-icon-pause { display: none; }
+.player-wrap.playing #cc-play .cc-icon-play  { display: none; }
+.player-wrap.playing #cc-play .cc-icon-pause { display: block; }
+
+/* Toggle volume icons based on muted */
+#cc-mute .cc-icon-vol-off { display: none; }
+.player-wrap.muted #cc-mute .cc-icon-vol-on  { display: none; }
+.player-wrap.muted #cc-mute .cc-icon-vol-off { display: block; }
+
+.cc-time {
+  color: white;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  padding: 0 6px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+.cc-spacer { flex: 1; }
+
+.cc-volume-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+.cc-volume {
+  width: 80px;
+  opacity: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin-left: 6px;
+  margin-right: 4px;
+}
+.cc-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+}
+
+.player-wrap:fullscreen { width: 100vw; height: 100vh; }
+.player-wrap:fullscreen video { object-fit: contain; }
+
+/* --- Player options popover (gear in cc-bar) --- */
+.cc-options-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 56px;
+  z-index: 6;
+  background: rgba(20, 12, 30, 0.92);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 14px;
+  padding: 14px;
+  min-width: 280px;
+  /* Cap the popover to the player area so it never overflows the bottom of
+     the video and scrolls internally when the cumulative content (style /
+     color / heights / heatmap / speed / resolution / subtitles) is taller
+     than the available space. */
+  max-height: calc(100% - 70px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.cc-options-panel::-webkit-scrollbar { width: 8px; }
+.cc-options-panel::-webkit-scrollbar-track { background: transparent; }
+.cc-options-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.cc-options-panel.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.cc-opt-section-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+/* Side-by-side row used for Resolution + Subtitles dropdowns. Saves vertical
+   space so the popover doesn't get cut off at the bottom of short players. */
+.cc-opt-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.cc-opt-col { min-width: 0; }
+.cc-opt-col .cc-opt-section-label { margin-top: 0; }
+.cc-opt-col .cc-dropdown { width: 100%; }
+.cc-opt-pills {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 12px;
+}
+.cc-opt-pills .theme-pill {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.2s, transform 0.1s;
+}
+.cc-opt-pills .theme-pill:active { transform: scale(0.96); }
+
+/* Per-style hover previews — gives you a glimpse of what each looks like */
+.cc-opt-pills .theme-pill[data-cc-pb="none"]:hover {
+  opacity: 0.55;
+  text-decoration: line-through;
+  border-color: rgba(255, 255, 255, 0.30);
+}
+.cc-opt-pills .theme-pill[data-cc-pb="solid"]:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: white;
+}
+.cc-opt-pills .theme-pill[data-cc-pb="glow"]:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 14px var(--accent), 0 0 4px var(--accent);
+  color: white;
+}
+.cc-opt-pills .theme-pill[data-cc-pb="neon"]:hover {
+  border-color: var(--accent);
+  background: rgba(192, 132, 252, 0.10);
+  box-shadow: 0 0 18px var(--accent), 0 0 8px var(--accent), 0 -4px 22px var(--accent-soft);
+  color: white;
+  text-shadow: 0 0 8px var(--accent);
+}
+.cc-opt-pills .theme-pill[data-cc-pb="pulse"]:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: white;
+  animation: optPulseHover 1.4s ease-in-out infinite;
+}
+@keyframes optPulseHover {
+  0%, 100% { box-shadow: 0 0 6px var(--accent); filter: brightness(0.95); }
+  50%      { box-shadow: 0 0 18px var(--accent); filter: brightness(1.30); }
+}
+.cc-opt-pills .theme-pill[data-cc-pb="rainbow"]:hover {
+  background: linear-gradient(90deg,
+    #ef4444, #f97316, #facc15, #4ade80,
+    #22d3ee, #3b82f6, #a855f7, #ec4899);
+  background-size: 220% 100%;
+  border-color: transparent;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  animation: optRainbowHover 3s linear infinite;
+}
+@keyframes optRainbowHover {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 220% 50%; }
+}
+.cc-opt-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase; letter-spacing: 1px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+/* --- Watch-page action buttons (Download + Subscribe) ---
+   Unified rounded-square shape, identical sizing, with a layered hover:
+   - Animated gradient border ring (conic that spins on hover)
+   - Subtle gradient sheen wash
+   - Lift + glow shadow
+   - Icon spring on press */
+.dl-btn,
+.sub-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.15s ease, border-color 0.2s ease,
+              color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
+}
+.dl-btn > *,
+.sub-btn > * { position: relative; z-index: 2; }
+
+/* Gradient sheen — fades in on hover behind the label. */
+.dl-btn::before,
+.sub-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 0;
+}
+/* Conic-gradient border ring — appears on hover and rotates for a subtle
+   "alive" feel without being noisy. Sits above the bg, below the label. */
+.dl-btn::after,
+.sub-btn::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from 0deg, var(--accent), #ec4899, #60a5fa, var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 1;
+  pointer-events: none;
+}
+.dl-btn:hover,
+.sub-btn:hover {
+  transform: translateY(-1px);
+  border-color: transparent;
+  color: white;
+  box-shadow:
+    0 6px 22px rgba(192, 132, 252, 0.40),
+    0 0 0 1px rgba(192, 132, 252, 0.20);
+}
+.dl-btn:hover::before,
+.sub-btn:hover::before { opacity: 0.85; }
+.dl-btn:hover::after,
+.sub-btn:hover::after {
+  opacity: 1;
+  animation: btnRingSpin 4s linear infinite;
+}
+@keyframes btnRingSpin {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+.dl-btn:hover svg {
+  animation: dlBounce 1s ease-in-out infinite;
+}
+@keyframes dlBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(2px); }
+}
+.dl-btn:active,
+.sub-btn:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow:
+    0 2px 8px rgba(192, 132, 252, 0.4),
+    inset 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition-duration: 0.08s;
+}
+/* Ripple flash on press — a soft radial flash centred on the button. */
+.dl-btn:active > svg,
+.sub-btn:active > svg { transform: scale(0.92); }
+.dl-btn:disabled,
+.sub-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.dl-btn:disabled:hover::before,
+.sub-btn:disabled:hover::before { opacity: 0; }
+.dl-btn:disabled:hover::after,
+.sub-btn:disabled:hover::after { opacity: 0; }
+
+/* --- Vertical volume slider on the LEFT of the player --- */
+.vol-side {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 50%;
+  z-index: 5;
+  opacity: 0;
+  transform-origin: left center;
+  transition: opacity 0.22s ease, width 0.18s ease;
+  pointer-events: auto;
+}
+/* Only show the volume slider when the cursor is near the left edge or
+   during an active volume change. Decoupled from controls-visible so it
+   doesn't linger after you stop scrolling. */
+.player-wrap.vol-active .vol-side { opacity: 1; }
+/* No size change on hover — stays static so it doesn't shift while interacting. */
+.vol-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.vol-fill {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to top, var(--accent), #ec4899);
+  border-radius: 0 0 4px 4px;
+  height: 100%;
+  transition: height 0.08s ease-out;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+/* Brief popup that flashes the volume % when changed via wheel/slider */
+.vol-indicator {
+  position: absolute;
+  left: 44px;
+  top: 50%;
+  transform: translate(-6px, -50%);
+  background: rgba(0, 0, 0, 0.82);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.vol-indicator.show {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+/* --- "Most Replayed" heatmap curve (YouTube-style) ---
+   Sits directly on top of the progress strip. Hidden at rest, fades in only
+   when the user hovers the player so the video isn't visually cluttered. */
+.player-heatmap {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 56px;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease, height 0.18s ease;
+}
+.player-heatmap svg { width: 100%; height: 100%; display: block; }
+.player-heatmap:empty { display: none; }
+:root[data-heatmap="off"] .player-heatmap { display: none !important; }
+.player-wrap:hover .player-heatmap { opacity: 1; }
+
+/* --- Custom themed progress strip at the very bottom of the player --- */
+.player-progress-strip {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: var(--pb-h, 4px);
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 3;             /* below the heatmap so the curve isn't clipped */
+  pointer-events: auto;
+  cursor: pointer;
+  overflow: hidden;       /* keep the progress fill clipped inside the bar */
+  transition: height 0.18s;
+}
+
+/* Hover line — lives on the player-wrap so it can extend above the strip
+   without breaking the strip's overflow:hidden (which the progress fill
+   styles depend on). Hidden until the user hovers the strip; the strip's
+   :hover toggles --pb-line-show via JS-set state. */
+.player-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  height: calc(var(--pb-h-hover, 12px) + 14px);
+  left: var(--seek-x, 0px);
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 5;
+}
+.player-wrap.pb-hovered::after { opacity: 1; }
+
+/* --- Seek preview tooltip ---
+   Floating bubble above the progress strip with a thumbnail (secondary
+   <video> seeked to the hover position) plus the timestamp.
+   --seek-x is set from JS on mousemove and clamped so the preview can't
+   slide off the player edge. */
+.seek-preview {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--pb-h-hover, 12px) + 14px);
+  transform: translate(
+    clamp(0px, calc(var(--seek-x, 0px) - 60px), calc(100% - 120px)),
+    0
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.seek-preview.show { opacity: 1; }
+.seek-preview-thumb-wrap {
+  position: relative;
+  width: 120px;
+  height: 68px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #000;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.seek-preview-thumb-img,
+.seek-preview-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
+}
+/* Static poster sits underneath; live <video> thumbnail layered on top
+   so when scrubbing works it overrides the poster. When use-poster is
+   set (DASH/HLS blob src, can't clone) the live thumb is hidden. */
+.seek-preview-thumb-img { z-index: 1; }
+.seek-preview-thumb     { z-index: 2; background: transparent; }
+.seek-preview.use-poster .seek-preview-thumb { display: none; }
+.seek-preview.no-thumb .seek-preview-thumb-wrap { display: none; }
+.seek-preview-time {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+.player-wrap:hover .player-progress-strip { height: var(--pb-h-hover, 12px); }
+.progress-fill {
+  height: 100%;
+  background: var(--pb-color, var(--accent));
+  width: 0%;
+  transition: width 0.12s linear;
+}
+:root[data-pbstyle="none"]  .player-progress-strip { display: none; }
+:root[data-pbstyle="solid"] .progress-fill { background: var(--pb-color, var(--accent)); }
+/* Style overrides only set glow/colour — NOT height. Heights are owned by the
+   base rule (4px) and the hover rule (12px) so every style grows on hover. */
+:root[data-pbstyle="glow"]  .player-progress-strip { background: rgba(0, 0, 0, 0.45); overflow: visible; }
+:root[data-pbstyle="glow"]  .progress-fill {
+  box-shadow: 0 0 10px var(--pb-color, var(--accent)), 0 0 4px var(--pb-color, var(--accent));
+}
+:root[data-pbstyle="neon"]  .player-progress-strip { overflow: visible; }
+:root[data-pbstyle="neon"]  .progress-fill {
+  background: var(--pb-color, var(--accent));
+  box-shadow:
+    0 0 14px var(--pb-color, var(--accent)),
+    0 0 6px var(--pb-color, var(--accent)),
+    0 -4px 22px var(--accent-soft);
+}
+:root[data-pbstyle="pulse"] .player-progress-strip { overflow: visible; }
+:root[data-pbstyle="pulse"] .progress-fill {
+  box-shadow: 0 0 8px var(--pb-color, var(--accent));
+  animation: pbPulse 1.6s ease-in-out infinite;
+}
+@keyframes pbPulse {
+  0%, 100% { filter: brightness(0.95); box-shadow: 0 0 6px var(--pb-color, var(--accent)); }
+  50%      { filter: brightness(1.35); box-shadow: 0 0 18px var(--pb-color, var(--accent)); }
+}
+
+/* --- Play bar color picker (gear popover) --- */
+:root[data-pbstyle="none"] .cc-opt-color-row,
+:root[data-pbstyle="rainbow"] .cc-opt-color-row { display: none; }
+.cc-opt-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.cc-color-pill {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5) inset;
+}
+.cc-color-pill:hover { transform: scale(1.12); }
+.cc-color-pill.active {
+  border-color: white;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5) inset, 0 0 10px var(--accent);
+}
+.cc-color-pill[data-pcol="accent"] { background: linear-gradient(135deg, var(--accent), #ec4899); }
+
+/* Playbar height sliders inside the gear popover */
+.cc-opt-height-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cc-opt-height-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.cc-opt-height-row label > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cc-opt-height-row label em {
+  font-style: normal;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.cc-opt-height-row input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.10);
+  background-image: linear-gradient(to right, var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-size: var(--cc-fill, 0%) 100%;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.cc-opt-height-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--accent);
+  cursor: pointer;
+}
+:root[data-pbstyle="none"] .cc-opt-height-row { display: none; }
+
+.cc-opt-empty {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.cc-opt-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+/* Custom subtitles dropdown — replaces native <select> for consistent look */
+.cc-dropdown { position: relative; width: 100%; }
+.cc-dropdown-btn {
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.40);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cc-dropdown-btn:hover { border-color: var(--glass-border-strong); background: rgba(0, 0, 0, 0.55); }
+.cc-dropdown.open .cc-dropdown-btn {
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.55);
+}
+.cc-dropdown-label {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-dropdown-caret {
+  flex: 0 0 auto;
+  color: var(--accent);
+  transition: transform 0.18s ease;
+}
+.cc-dropdown.open .cc-dropdown-caret { transform: rotate(180deg); }
+
+.cc-dropdown-list {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(100% + 6px);    /* opens upward — popover sits at bottom of player */
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(20, 12, 30, 0.96);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cc-dropdown.open .cc-dropdown-list {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.cc-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+.cc-dropdown-item.active {
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.40);
+  color: #fbcfe8;
+}
+.cc-dropdown-list::-webkit-scrollbar { width: 6px; }
+.cc-dropdown-list::-webkit-scrollbar-track { background: transparent; }
+.cc-dropdown-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+}
+:root[data-pbstyle="rainbow"] .player-progress-strip { overflow: visible; }
+:root[data-pbstyle="rainbow"] .progress-fill {
+  background: linear-gradient(90deg,
+    #ef4444 0%, #f97316 14%, #facc15 28%, #4ade80 42%,
+    #22d3ee 56%, #3b82f6 70%, #a855f7 84%, #ec4899 100%);
+  background-size: 200% 100%;
+  animation: pbRainbow 4.5s linear infinite;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+}
+@keyframes pbRainbow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.video-meta { margin-top: 18px; }
+.video-meta h1 { font-size: 22px; font-weight: 600; margin: 0; line-height: 1.3; }
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+.title-row h1 { flex: 1; min-width: 0; }
+.title-row .stats {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+  padding-top: 6px;
+  text-align: right;
+}
+@media (max-width: 800px) {
+  .title-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .title-row .stats { padding-top: 0; text-align: left; }
+}
+
+.channel-row {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 16px; padding: 12px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  backdrop-filter: blur(var(--blur));
+}
+.channel-link {
+  /* fit content + equal padding all around so the hover outline hugs the
+     avatar+name area instead of stretching across the row */
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  background: transparent;
+  border: none;
+  padding: 8px 14px 8px 8px;
+  margin: -8px 0 -8px -8px;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  border-radius: 14px;
+  transition: background 0.15s ease;
+}
+.channel-row { gap: 10px; }
+.channel-row > .dl-btn { margin-left: auto; } /* eats space, sub-btn sits next to it */
+.channel-row .sub-btn { margin-left: 0; }     /* override default to keep dl + sub adjacent */
+.channel-link[disabled] { cursor: default; }
+.channel-link:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.06);
+}
+.channel-link:hover:not([disabled]) .channel-name { color: var(--accent); }
+
+.channel-avatar-small {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  /* avoid sub-pixel borders that cause the circle to look "cut off" */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: box-shadow 0.18s ease, transform 0.15s ease;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.channel-link:hover:not([disabled]) .channel-avatar-small {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 16px var(--accent-soft);
+  transform: scale(1.04);
+}
+
+.channel-row .channel-name {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+
+/* --- Channel page --- */
+.channel-page { padding-bottom: 20px; }
+.channel-banner {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  border: 1px solid var(--glass-border);
+}
+.channel-banner img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 6/1;
+  object-fit: cover;
+}
+.channel-info {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--blur));
+}
+.channel-avatar {
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+.channel-meta { min-width: 0; flex: 1; }
+.channel-meta h1 { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+.channel-stats { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+.channel-desc {
+  color: #d4cce8;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 760px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+/* Old pill-style block was here — removed in favour of the unified
+   .dl-btn / .sub-btn rounded-square block higher up. Only the
+   margin-left:auto and the subscribed-state look stay. */
+.sub-btn { margin-left: auto; }
+.sub-btn.subbed {
+  /* Match the Download button's resting look so the two read as a pair. */
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+.sub-btn.subbed::before { opacity: 0; }
+.sub-btn.subbed:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+  /* Suppress the gradient sheen for the "already subscribed" state — it's a
+     destructive action (unsubscribe), shouldn't read as the primary CTA. */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.sub-btn.subbed:hover::before { opacity: 0; }
+.sub-btn.subbed:hover::after { opacity: 0; }
+
+.video-desc-wrap {
+  margin-top: 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  overflow: hidden;
+}
+.desc-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+.desc-toggle {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 13px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+.desc-toggle:hover { color: var(--text); background: var(--glass); }
+.desc-toggle.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.35);
+}
+.video-desc {
+  padding: 8px 16px 14px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #d4cce8;
+  max-height: 240px;
+  overflow-y: auto;
+  word-wrap: break-word;
+  overscroll-behavior: contain;
+}
+.video-desc .desc-link { color: var(--accent); text-decoration: none; cursor: pointer; }
+.video-desc .desc-link:hover { text-decoration: underline; }
+
+.related { display: flex; flex-direction: column; gap: 8px; }
+.related .row {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: 12px;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.related .row:hover {
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+.related .row .thumb {
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1326;
+  position: relative;
+}
+.related .row .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.related .row .thumb .duration {
+  position: absolute; bottom: 4px; right: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 1px 5px; border-radius: 3px;
+  font-size: 10px;
+}
+.related .row .info { display: flex; flex-direction: column; justify-content: flex-start; padding: 2px 0; min-width: 0; }
+.related .row .title {
+  font-size: 13px; font-weight: 500; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.related .row .sub { font-size: 11px; color: var(--muted); }
+
+/* --- Up next layout modes: overlay (title on thumb) and thumbs-only --- */
+.related[data-mode="overlay"] .row {
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  position: relative;             /* anchor the absolute-positioned .info */
+  margin-bottom: 4px;
+}
+.related[data-mode="overlay"] .row .thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.related[data-mode="overlay"] .row .info {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 26px 12px 10px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.55) 55%, transparent 100%);
+  pointer-events: none;
+  border-radius: 0 0 10px 10px;
+}
+.related[data-mode="overlay"] .row .title {
+  color: white;
+  font-size: 12px;
+  margin-bottom: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.related[data-mode="overlay"] .row .sub {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 10px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.related[data-mode="overlay"] .row:hover .thumb { box-shadow: 0 0 0 2px var(--accent); }
+
+.related[data-mode="thumbs"] .row {
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.related[data-mode="thumbs"] .row .thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 10px;
+}
+.related[data-mode="thumbs"] .row .info { display: none; }
+.related[data-mode="thumbs"] .row:hover .thumb { box-shadow: 0 0 0 2px var(--accent); }
+
+/* --- States --- */
+.empty {
+  color: var(--muted);
+  padding: 60px 20px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Loader: styled to match the GLASS brand wordmark — uppercase, wide
+   letter-spacing, lavender colour, breathing drop-shadow + a glowing orb. */
+.loader {
+  padding: 60px 20px;
+  text-align: center;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  line-height: 1;
+  color: #e9d5ff;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  text-shadow:
+    0 0 10px rgba(216, 180, 254, 0.50),
+    0 0 26px rgba(168, 85, 247, 0.30);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  will-change: filter;
+  animation: loaderGlow 5s ease-in-out infinite;
+}
+.loader::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: loaderOrb 1.4s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+@keyframes loaderGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.30)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(216, 180, 254, 0.70)); }
+}
+@keyframes loaderOrb {
+  0%, 100% {
+    transform: scale(0.65);
+    box-shadow: 0 0 6px var(--accent), 0 0 14px var(--accent);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 18px var(--accent), 0 0 36px var(--accent);
+  }
+}
+
+.error {
+  background: rgba(244, 114, 182, 0.08);
+  border: 1px solid rgba(244, 114, 182, 0.25);
+  color: #fbcfe8;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin: 20px auto;
+  max-width: 600px;
+  font-size: 14px;
+}
+
+/* --- Account button (logged-in state) --- */
+#account-btn.logged-in {
+  color: var(--text);
+  background: var(--glass);
+  border-color: var(--glass-border);
+  letter-spacing: 0.5px;
+  text-transform: none;
+  font-size: 12px;
+}
+#account-btn.logged-in::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  margin-right: 8px;
+  vertical-align: middle;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+/* --- Modal --- */
+.modal {
+  position: fixed; inset: 0;
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal.hidden { display: none; }
+.modal-bg {
+  position: absolute; inset: 0;
+  background: rgba(5, 3, 9, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.modal-close-x {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.modal-close-x:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  color: #fff;
+}
+.modal-card {
+  position: relative;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  background: rgba(20, 12, 30, 0.85);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 20px;
+  padding: 28px;
+  backdrop-filter: blur(40px) saturate(140%);
+  -webkit-backdrop-filter: blur(40px) saturate(140%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: modalIn 0.18s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.modal .modal-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.modal label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+.modal input[type="text"],
+.modal input[type="password"] {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit; font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.modal input:focus { border-color: var(--accent); background: var(--glass-strong); }
+
+.modal-actions {
+  display: flex; gap: 8px;
+  margin-top: 22px;
+}
+.modal-actions button {
+  flex: 1;
+  min-height: 52px;
+  border-radius: 12px;
+  /* Solid, fixed-alpha border — the previous var(--glass-border) followed
+     the user's glass-alpha slider so edges looked fuzzy at low values. */
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.modal-actions button:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.modal-actions button:active { transform: scale(0.98); }
+.modal-actions button.primary {
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: white;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
+}
+.modal-actions button.primary:hover { filter: brightness(1.06); }
+.modal-actions button.danger {
+  color: #fca5a5;
+  border-color: rgba(244, 114, 182, 0.32);
+}
+.modal-actions button.danger:hover {
+  color: #fbcfe8;
+  background: rgba(244, 114, 182, 0.08);
+  border-color: rgba(244, 114, 182, 0.50);
+}
+.modal-actions button:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
+.modal-actions button.primary {
+  background: linear-gradient(135deg, #c084fc, #ec4899);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+.modal-actions button.primary:hover { filter: brightness(1.08); }
+.modal-actions button.danger {
+  color: #fca5a5;
+  border-color: rgba(244, 114, 182, 0.25);
+}
+
+.modal-divider {
+  margin: 22px -28px;
+  height: 1px;
+  background: var(--glass-border);
+}
+.modal .toggle-row {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.modal .toggle-row a {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.modal .toggle-row a:hover { text-decoration: underline; }
+
+.modal .info-row {
+  display: flex; justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+}
+.modal .info-row span:first-child { color: var(--muted); }
+.modal .info-row span:last-child { color: var(--text); }
+
+.modal .name-row {
+  display: flex; gap: 8px; align-items: center;
+  margin: 4px 0 6px;
+}
+.modal .name-row input {
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  outline: none;
+  font: inherit; font-size: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.modal .name-row input:focus { border-color: var(--accent); background: var(--glass-strong); }
+.modal .name-row button {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  color: white;
+  cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600;
+  transition: filter 0.15s, transform 0.1s;
+}
+.modal .name-row button:hover { filter: brightness(1.08); }
+.modal .name-row button:active { transform: scale(0.97); }
+
+.modal .msg {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+.modal .msg.error { background: rgba(244, 114, 182, 0.12); border: 1px solid rgba(244, 114, 182, 0.3); color: #ffffff; }
+.modal .msg.success { background: rgba(74, 222, 128, 0.10); border: 1px solid rgba(74, 222, 128, 0.3); color: #ffffff; font-weight: 500; }
+.modal .msg.muted { color: var(--muted); padding: 0; margin-top: 8px; }
+
+/* --- Auth method cards --- */
+.auth-options { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 8px; }
+.auth-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.auth-card:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
+.auth-card:active { transform: scale(0.99); }
+.auth-card .auth-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 18px;
+  flex-shrink: 0;
+}
+.auth-card .auth-icon.google { background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 100%); color: white; }
+.auth-card .auth-icon.piped  { background: linear-gradient(135deg, #c084fc, #ec4899); color: white; }
+.auth-card .auth-icon.takeout{ background: rgba(255,255,255,0.10); color: var(--text); border: 1px solid var(--glass-border); }
+.auth-card .auth-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.auth-card .auth-text strong { font-size: 14px; font-weight: 600; }
+.auth-card .auth-text span { font-size: 12px; color: var(--muted); }
+.auth-card .auth-status {
+  margin-left: auto;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #4ade80;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Donate menu --- */
+.auth-card.donate-option {
+  /* the donate-card is a button, so reset native button styling */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+.donate-logo {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.donate-logo svg { width: 100%; height: 100%; display: block; }
+.donate-logo-kofi { background: #FF5E5B; }
+.donate-logo-xmr  { background: #4D4D4D; }
+.donate-arrow {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s, color 0.15s;
+}
+.auth-card.donate-option:hover .donate-arrow {
+  transform: translateX(2px);
+  color: var(--accent);
+}
+
+/* XMR address panel */
+.xmr-addrwrap {
+  margin: 16px 0 12px;
+  padding: 14px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+}
+.xmr-addr-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.xmr-addr {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  word-break: break-all;
+  user-select: all;
+}
+.xmr-addr code {
+  font-family: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.xmr-addr-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.xmr-addr-row button {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.xmr-addr-row button:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+}
+.xmr-addr-row button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #1a0a2e;
+  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
+}
+.xmr-addr-row button.primary:hover { filter: brightness(1.06); }
+.xmr-uri-msg {
+  margin-top: 10px;
+  font-size: 11px;
+  min-height: 14px;
+}
+.xmr-placeholder {
+  margin: 16px 0;
+  padding: 14px 16px;
+  background: var(--glass);
+  border: 1px dashed var(--glass-border-strong);
+  border-radius: 12px;
+}
+.xmr-placeholder p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+.xmr-placeholder p:last-child { margin-bottom: 0; }
+.xmr-placeholder code {
+  font-family: monospace;
+  background: rgba(0,0,0,0.35);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.xmr-placeholder a { color: var(--accent); cursor: pointer; }
+.xmr-placeholder a:hover { text-decoration: underline; }
+
+/* --- Setup steps --- */
+.setup-steps {
+  margin: 12px 0 18px;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.setup-steps li { margin-bottom: 8px; }
+.setup-steps a { color: var(--accent); cursor: pointer; text-decoration: none; }
+.setup-steps a:hover { text-decoration: underline; }
+.setup-steps strong { color: var(--text); }
+.setup-steps em { font-style: normal; color: var(--accent); }
+
+/* --- Settings modal --- */
+.theme-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+
+/* Download folder picker row */
+.dl-folder-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.dl-folder-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.2px;
+  cursor: default;
+}
+.dl-folder-input:focus { outline: none; border-color: var(--accent); }
+.dl-folder-row .theme-pill { height: 34px; }
+.theme-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit; font-size: 12px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.theme-pill:hover { background: var(--glass-strong); }
+.theme-pill.active { border-color: var(--accent); background: var(--accent-soft); }
+.theme-pill span {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset;
+}
+
+.slider-row {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px 0 6px;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none; appearance: none;
+  height: 4px;
+  background: var(--glass-strong);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 0 4px rgba(192,132,252,0.0), 0 2px 8px rgba(0,0,0,0.4);
+  transition: box-shadow 0.15s;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 6px rgba(192,132,252,0.18), 0 2px 8px rgba(0,0,0,0.4);
+}
+.slider-val {
+  min-width: 56px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Top banner (e.g. yt-dlp install prompt) --- */
+#banner:empty { display: none; }
+#banner { padding: 14px 28px 0; }
+.install-banner {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 18px;
+  background: rgba(192, 132, 252, 0.10);
+  border: 1px solid rgba(192, 132, 252, 0.28);
+  border-radius: 14px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+}
+.install-banner .banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.install-banner .banner-text strong { font-size: 14px; font-weight: 700; color: var(--text); }
+.install-banner .banner-text span {
+  font-size: 13px;
+  color: rgba(236, 230, 255, 0.78);  /* brighter than --muted but still subdued vs the bold heading */
+  font-weight: 400;
+}
+.install-banner button {
+  height: 34px; padding: 0 18px;
+  border-radius: 17px;
+  background: linear-gradient(135deg, #c084fc, #ec4899);
+  color: white; border: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600;
+  transition: filter 0.15s;
+  white-space: nowrap;
+}
+.install-banner button:hover { filter: brightness(1.08); }
+.install-banner button:disabled { opacity: 0.6; cursor: default; }
+.install-banner .progress {
+  width: 220px; height: 6px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 3px; overflow: hidden;
+}
+.install-banner .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c084fc, #ec4899);
+  width: 0%;
+  transition: width 0.15s;
+}
+.install-banner .progress-label {
+  font-size: 11px; color: var(--muted);
+  margin-left: 8px; min-width: 50px; text-align: right;
+}
+.install-banner.success {
+  background: rgba(74, 222, 128, 0.10);
+  border-color: rgba(74, 222, 128, 0.28);
+}
+.install-banner.error {
+  background: rgba(244, 114, 182, 0.10);
+  border-color: rgba(244, 114, 182, 0.28);
+}
+
+/* --- Pretty resume-last banner --- */
+.resume-last-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background:
+    linear-gradient(135deg, rgba(192, 132, 252, 0.10), rgba(236, 72, 153, 0.06)),
+    rgba(20, 12, 30, 0.55);
+  border: 1px solid rgba(192, 132, 252, 0.28);
+  border-radius: 16px;
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+.resume-thumb-wrap {
+  position: relative;
+  width: 160px;
+  aspect-ratio: 16/9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.resume-thumb-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.resume-thumb-wrap .resume-thumb-progress {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.65);
+}
+.resume-thumb-wrap .resume-thumb-progress > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #ec4899);
+  box-shadow: 0 0 6px var(--accent);
+}
+.resume-thumb-wrap .resume-thumb-time {
+  position: absolute;
+  top: 6px; right: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: white;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+}
+
+.resume-info { flex: 1; min-width: 0; }
+.resume-prompt {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.resume-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resume-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.resume-actions {
+  display: flex; gap: 10px;
+  flex-shrink: 0;
+}
+.resume-actions button {
+  height: 40px;
+  padding: 0 22px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.2s, filter 0.15s;
+}
+.resume-actions button:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+.resume-actions button:active { transform: translateY(0) scale(0.97); }
+/* Continue — vivid gradient fill with a moving sheen on hover. The bg uses
+   background-clip:padding-box so no transparent-border seam shows. A pseudo
+   sheen sweeps across at 1.6s on hover. Layered glow shadow for depth. */
+.resume-actions button.primary {
+  position: relative;
+  border: none;
+  background:
+    linear-gradient(135deg, var(--accent) 0%, #ec4899 60%, #f97316 120%);
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    0 6px 18px rgba(192, 132, 252, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 1px 0 rgba(255, 255, 255, 0.30) inset;
+  transition: background-position 0.5s ease, box-shadow 0.25s ease,
+              transform 0.12s ease, filter 0.15s ease;
+}
+/* Sheen sweep — diagonal highlight that runs across the button on hover.
+   Sits above the bg via z-index but below the label text. */
+.resume-actions button.primary::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -60%;
+  width: 50%;
+  background: linear-gradient(115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.30) 45%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.30) 55%,
+    transparent 100%);
+  transform: skewX(-18deg);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.resume-actions button.primary > * { position: relative; z-index: 2; }
+.resume-actions button.primary:hover {
+  background-position: 100% 50%;
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 26px rgba(192, 132, 252, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.10) inset,
+    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+}
+.resume-actions button.primary:hover::before {
+  opacity: 1;
+  animation: continueSheen 1.6s ease-in-out infinite;
+}
+@keyframes continueSheen {
+  0%   { left: -60%; }
+  100% { left: 130%; }
+}
+.resume-actions button.primary:active {
+  transform: translateY(0) scale(0.97);
+  filter: brightness(0.95);
+  box-shadow:
+    0 3px 10px rgba(192, 132, 252, 0.45),
+    inset 0 2px 5px rgba(0, 0, 0, 0.18);
+}
