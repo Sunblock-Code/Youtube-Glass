@@ -4942,44 +4942,75 @@ function showSettings() {
   });
 
   // --- Donate button hide/show flow (Theme tab) ---
+  // Confirming or un-hiding used to call showSettings(), which rebuilds the
+  // whole modal — that yanked the user back to the top of the Theme tab and
+  // disposed of every DOM node in the dialog. To them it looks like the UI
+  // "moves out of the settings box". We now patch just the donate-toggle-wrap
+  // in place and re-bind only its own handlers. Scroll position, the active
+  // tab, and every other field stay exactly where the user left them.
   const DONATE_PHRASE = 'I HATE YOU AND DONT WANT TO GIVE YOU MONEY';
-  const donateShowBtn = modalBody.querySelector('#s-donate-show');
-  if (donateShowBtn) {
-    donateShowBtn.onclick = () => {
-      update({ hideDonateButton: false });
-      // Re-render the settings dialog to flip the UI back to the "Hide" state.
-      showSettings();
-      // Re-open the Theme tab since showSettings opens with Theme by default.
-    };
+  const donateWrap = modalBody.querySelector('#donate-toggle-wrap');
+  const renderDonateToggle = () => {
+    if (!donateWrap) return;
+    const s = currentSettings;
+    donateWrap.innerHTML = s.hideDonateButton ? `
+      <button id="s-donate-show" class="theme-pill">Show donate button</button>
+      <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px">Currently hidden. Click to bring it back.</div>
+    ` : `
+      <button id="s-donate-hide-init" class="theme-pill">Hide donate button</button>
+      <div id="donate-confirm" class="donate-confirm" style="display:none">
+        <div class="hint" style="font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0">
+          To hide the donate button, type the following phrase exactly:
+          <div style="font-family:monospace;color:var(--text);background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:6px;margin-top:6px;user-select:all;letter-spacing:0.4px;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box">I HATE YOU AND DONT WANT TO GIVE YOU MONEY</div>
+        </div>
+        <input type="text" id="s-donate-phrase" autocomplete="off" spellcheck="false" placeholder="Type the phrase…" style="width:100%;max-width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--text);font-family:monospace;font-size:12px;letter-spacing:0.4px;box-sizing:border-box" />
+        <div id="s-donate-phrase-msg" class="hint" style="font-size:11px;color:#fca5a5;margin-top:6px;min-height:14px"></div>
+      </div>
+    `;
+    bindDonateHandlers();
+  };
+  function bindDonateHandlers() {
+    const showBtn = modalBody.querySelector('#s-donate-show');
+    if (showBtn) {
+      showBtn.onclick = () => {
+        update({ hideDonateButton: false });
+        renderDonateToggle();
+      };
+    }
+    const hideInit = modalBody.querySelector('#s-donate-hide-init');
+    const confirm  = modalBody.querySelector('#donate-confirm');
+    const phrase   = modalBody.querySelector('#s-donate-phrase');
+    const phraseMsg = modalBody.querySelector('#s-donate-phrase-msg');
+    if (hideInit) {
+      hideInit.onclick = () => {
+        confirm.style.display = 'block';
+        hideInit.style.display = 'none';
+        phrase.focus();
+        // Browsers sometimes skip auto-scroll on hidden→shown elements; nudge
+        // the confirm UI into view so the user can actually see what they're
+        // about to type into.
+        confirm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
+    }
+    if (phrase) {
+      const tryConfirm = () => {
+        const v = phrase.value.trim();
+        if (v === DONATE_PHRASE) {
+          update({ hideDonateButton: true });
+          renderDonateToggle();
+        } else if (v.length >= DONATE_PHRASE.length) {
+          phraseMsg.textContent = 'That isn\'t the phrase. Type it exactly as shown.';
+        } else {
+          phraseMsg.textContent = '';
+        }
+      };
+      phrase.addEventListener('input', tryConfirm);
+      phrase.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); tryConfirm(); }
+      });
+    }
   }
-  const donateHideInit = modalBody.querySelector('#s-donate-hide-init');
-  const donateConfirm  = modalBody.querySelector('#donate-confirm');
-  const donatePhrase   = modalBody.querySelector('#s-donate-phrase');
-  const donatePhraseMsg = modalBody.querySelector('#s-donate-phrase-msg');
-  if (donateHideInit) {
-    donateHideInit.onclick = () => {
-      donateConfirm.style.display = 'block';
-      donateHideInit.style.display = 'none';
-      donatePhrase.focus();
-    };
-  }
-  if (donatePhrase) {
-    const tryConfirm = () => {
-      const v = donatePhrase.value.trim();
-      if (v === DONATE_PHRASE) {
-        update({ hideDonateButton: true });
-        showSettings();
-      } else if (v.length >= DONATE_PHRASE.length) {
-        donatePhraseMsg.textContent = 'That isn\'t the phrase. Type it exactly as shown.';
-      } else {
-        donatePhraseMsg.textContent = '';
-      }
-    };
-    donatePhrase.addEventListener('input', tryConfirm);
-    donatePhrase.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); tryConfirm(); }
-    });
-  }
+  bindDonateHandlers();
   modalBody.querySelectorAll('.theme-pill[data-cp]').forEach(btn => {
     btn.onclick = () => {
       modalBody.querySelectorAll('.theme-pill[data-cp]').forEach(b => b.classList.toggle('active', b === btn));
