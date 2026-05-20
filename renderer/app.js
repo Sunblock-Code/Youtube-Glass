@@ -1153,7 +1153,16 @@ async function renderHomeDashboard() {
         if (ch.name && entry.name !== ch.name) { entry.name = ch.name; avatarsChanged = true; }
       }
 
-      const items = (ch.relatedStreams || []).slice(0, 12);
+      let items = (ch.relatedStreams || []).slice(0, 12);
+      // Piped occasionally returns empty relatedStreams for channels that
+      // yt-dlp can still extract just fine. Fall back to a local yt-dlp
+      // listing so the dashboard row isn't permanently stuck on "No videos."
+      if (!items.length && ytdlpReady) {
+        try {
+          const r = await window.app.ytdlp.getChannelVideos(c.id, 12);
+          if (r?.ok && Array.isArray(r.items) && r.items.length) items = r.items;
+        } catch { /* ignore — fall through to empty message */ }
+      }
       if (!items.length) {
         container.innerHTML = `<div class="empty" style="padding:20px;flex:1">No videos.</div>`;
         return;
@@ -2899,11 +2908,27 @@ async function renderVideo(id) {
 
 async function renderChannel(id) {
   const ch = await api.channel(id);
+  // Piped sometimes serves a channel with an empty relatedStreams while
+  // still returning name/avatar/banner. Fall back to yt-dlp so the page
+  // doesn't show "No videos to show." when there clearly are some.
+  let initialItems = [...(ch.relatedStreams || [])];
+  let initialNext = ch.nextpage || null;
+  if (!initialItems.length && ytdlpReady) {
+    try {
+      const r = await window.app.ytdlp.getChannelVideos(id, 30);
+      if (r?.ok && Array.isArray(r.items) && r.items.length) {
+        initialItems = r.items;
+        // yt-dlp gives us a fixed batch — no Piped nextpage token applies.
+        // Pagination via "Load more" is disabled for yt-dlp-sourced views.
+        initialNext = null;
+      }
+    } catch { /* ignore — render whatever we have */ }
+  }
   // Stateful: items grow as the user loads more pages; the active sort
   // determines render order each time.
   const state = {
-    items: [...(ch.relatedStreams || [])],
-    nextpage: ch.nextpage || null,
+    items: initialItems,
+    nextpage: initialNext,
     sort: 'latest',
     loading: false,
   };

@@ -116,6 +116,66 @@ function getVideo(videoId) {
   });
 }
 
+// List a channel's recent uploads via yt-dlp. Used as a fallback when the
+// Piped instance returns an empty relatedStreams for a channel (Piped's
+// extractor occasionally breaks for specific channels while yt-dlp keeps
+// working). Returns items shaped to match Piped's relatedStreams entries
+// so the renderer can drop them in without conversion logic.
+//
+// Flat-playlist is used because we only need card-level metadata (id,
+// title, thumbnail, duration). The trade-off: yt-dlp doesn't populate
+// view_count / uploader / timestamp in flat mode, so those fields come
+// back as null/empty — the renderer treats missing values gracefully.
+function getChannelVideos(channelId, limit) {
+  return new Promise((resolve, reject) => {
+    if (!isInstalled()) return reject(new Error('yt-dlp not installed'));
+    const url = `https://www.youtube.com/channel/${channelId}/videos`;
+    const n = Math.max(1, Math.min(100, Number(limit) || 30));
+    execFile(
+      binPath(),
+      [
+        '--flat-playlist',
+        '--dump-single-json',
+        '--no-warnings',
+        '--no-call-home',
+        '--ignore-config',
+        '--playlist-end', String(n),
+        url,
+      ],
+      { maxBuffer: 64 * 1024 * 1024, timeout: 60_000, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) {
+          const tail = (stderr || '').trim().split('\n').slice(-3).join(' ');
+          return reject(new Error(tail || err.message));
+        }
+        try {
+          const data = JSON.parse(stdout);
+          const entries = data.entries || [];
+          const items = entries
+            .filter(v => v && v.id)
+            .map(v => {
+              const thumb = (v.thumbnails && v.thumbnails.length)
+                ? v.thumbnails[v.thumbnails.length - 1].url
+                : `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`;
+              return {
+                url: `/watch?v=${v.id}`,
+                title: v.title || '',
+                thumbnail: thumb,
+                duration: typeof v.duration === 'number' ? Math.round(v.duration) : 0,
+                uploaderName: v.uploader || data.uploader || data.channel || '',
+                views: typeof v.view_count === 'number' ? v.view_count : null,
+                uploaded: typeof v.timestamp === 'number' ? v.timestamp * 1000 : 0,
+              };
+            });
+          resolve(items);
+        } catch (e) {
+          reject(new Error('Failed to parse yt-dlp output: ' + e.message));
+        }
+      }
+    );
+  });
+}
+
 // Spawn yt-dlp to download a video. Streams progress back via onProgress
 // (called with { percent, totalBytes, speed, eta } when yt-dlp prints
 // progress lines). Returns a promise that resolves with the final filename.
@@ -180,4 +240,4 @@ function downloadVideo(videoId, opts, onProgress) {
   });
 }
 
-module.exports = { binPath, isInstalled, install, getVideo, downloadVideo };
+module.exports = { binPath, isInstalled, install, getVideo, getChannelVideos, downloadVideo };
