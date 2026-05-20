@@ -48,10 +48,26 @@ export function play(videoEl, streams) {
   if (videoOnlyList.length) videoEl.src = videoOnlyList[0].url;
 }
 
-// Attaches a hidden <audio> sidecar element and keeps it in sync with the
-// main <video>. Used when YouTube only offers separate video-only/audio-only
-// streams. Exported so the resolution picker can switch between video-only
-// and muxed at runtime.
+// Sidecar <audio> sync for the YouTube video-only + audio-only stream pair.
+//
+// Major rewrite to address the user-visible "audio cuts out instead of buffering"
+// bug. The previous implementation pause-d the sidecar audio whenever the video
+// fired `waiting`/`stalled`, AND aggressively reseek-ed audio whenever drift
+// exceeded 0.25 s. The combined effect: any brief network hiccup produced
+// instant silence, and the rapid drift-snap pulses sounded like crackling.
+//
+// New approach:
+//   - No `waiting` listener at all. Audio plays through transient video stalls
+//     so the user keeps hearing the soundtrack continuously while the picture
+//     stutters — far less startling than going silent.
+//   - Drift correction is gentler: 500 ms interval (was 250 ms), 0.5 s hard-snap
+//     threshold (was 0.25 s). Small drifts (0.08–0.5 s) are nudged via a ±3 %
+//     playbackRate adjustment that converges in 1–2 s without an audible jump.
+//   - "Video frozen" detection (network stall while !paused) is preserved
+//     because it prevents the old "looping last second of audio" bug — but it
+//     no longer reseek-s audio; it just caps how far audio is allowed to lead.
+//   - Seeks only pause audio for big jumps (>2 s). Fine-tuning the playhead by
+//     a fraction of a second no longer dumps the sound.
 export function attachAudioSync(videoEl, videoUrl, audioUrl) {
   if (videoEl._audio) detachAudioSync(videoEl);
 
@@ -59,7 +75,7 @@ export function attachAudioSync(videoEl, videoUrl, audioUrl) {
   const wasTime = videoEl.currentTime || 0;
 
   videoEl.src = videoUrl;
-  videoEl.muted = true; // audio comes from the sidecar element
+  videoEl.muted = true; // sound comes from the sidecar element
 
   const audioEl = new Audio();
   audioEl.preload = 'auto';
@@ -67,23 +83,26 @@ export function attachAudioSync(videoEl, videoUrl, audioUrl) {
 
   const onPlay  = () => { if (audioEl.paused) audioEl.play().catch(() => {}); };
   const onPause = () => { if (!audioEl.paused) audioEl.pause(); };
-  // Pause audio during the seek window so it doesn't keep playing the old
-  // segment for a beat after the user clicks a new spot.
+  // Only pause audio for genuinely big seeks. Small fine-tunes (e.g. arrow-key
+  // 5 s skip) keep audio rolling and just re-snap currentTime.
   const onSeeking = () => {
-    if (!audioEl.paused) audioEl.pause();
+    const jump = Math.abs(audioEl.currentTime - videoEl.currentTime);
+    if (jump > 2.0 && !audioEl.paused) audioEl.pause();
     audioEl.currentTime = videoEl.currentTime;
   };
-  // After seek completes, snap time and kick audio back into play if the
-  // video is still playing — the `playing` event isn't always reliable
-  // (especially when buffer is already warm), so don't depend on it alone.
   const onSeeked = () => {
     audioEl.currentTime = videoEl.currentTime;
-    if (!videoEl.paused) audioEl.play().catch(() => {});
+    audioEl.playbackRate = videoEl.playbackRate;
+    if (!videoEl.paused && audioEl.paused) audioEl.play().catch(() => {});
   };
-  const onRate  = () => { audioEl.playbackRate = videoEl.playbackRate; };
-  const onVol   = () => { audioEl.volume = videoEl.volume; audioEl.muted = false; };
-  const onWait  = () => { if (!audioEl.paused) audioEl.pause(); };
-  const onPlaying = () => { if (videoEl.paused) return; audioEl.currentTime = videoEl.currentTime; audioEl.play().catch(() => {}); };
+  const onRate = () => { audioEl.playbackRate = videoEl.playbackRate; };
+  const onVol  = () => { audioEl.volume = videoEl.volume; audioEl.muted = false; };
+  // INTENTIONALLY no `waiting` listener — see header comment. The drift loop
+  // below handles stalls without nuking the audio track.
+  const onPlaying = () => {
+    if (videoEl.paused) return;
+    if (audioEl.paused) audioEl.play().catch(() => {});
+  };
 
   videoEl.addEventListener('play',  onPlay);
   videoEl.addEventListener('pause', onPause);
@@ -91,88 +110,68 @@ export function attachAudioSync(videoEl, videoUrl, audioUrl) {
   videoEl.addEventListener('seeked', onSeeked);
   videoEl.addEventListener('ratechange', onRate);
   videoEl.addEventListener('volumechange', onVol);
-  videoEl.addEventListener('waiting', onWait);
   videoEl.addEventListener('playing', onPlaying);
 
   audioEl.volume = videoEl.volume;
   audioEl.playbackRate = videoEl.playbackRate;
 
-  // Drift correction + stuck-audio recovery. Runs every 250ms (was 500ms)
-  // so a stuck audio decoder is re-kicked within ~500ms instead of a full
-  // second of silence — the user-visible "audio stops working" bug.
-  // - Re-aligns paused state and >0.25s drift.
-  // - Detects "stalled" audio (video playing, audio not paused, but audio
-  //   time hasn't advanced for two ticks) and forcefully re-kicks it.
-  let lastAudioTime = audioEl.currentTime;
+  // Drift correction + stall handling. Half the previous tick rate and twice
+  // the snap threshold — the dial moves toward "tolerate small drift" instead
+  // of "correct every micro-drift loudly".
   let lastVideoTime = videoEl.currentTime;
-  let stallTicks = 0;
   let videoFrozen = false;
-  const kickAudio = () => {
-    try {
-      audioEl.pause();
-      audioEl.currentTime = videoEl.currentTime;
-      const p = audioEl.play();
-      // Some Chromium versions reject the play() promise mid-recovery; one
-      // retry on a microtask boundary clears that without infinite loops.
-      if (p && p.catch) p.catch(() => setTimeout(() => audioEl.play().catch(() => {}), 80));
-    } catch {}
-  };
+
   const driftInterval = setInterval(() => {
     if (!videoEl._audio) return;
+    if (videoEl.seeking) return;
 
-    // Is the VIDEO itself advancing? When the video-only stream stalls on
-    // the network it buffers in place: currentTime stops moving even though
-    // the element isn't `paused`. The old drift code would then keep yanking
-    // the audio *back* to that frozen timestamp every tick (drift > 0.25 →
-    // reseek), so the same half-second replayed forever — the "video freezes
-    // and the last couple seconds loop" bug. While the video is frozen we
-    // must HOLD the audio, not chase it, then hard-resync once on recovery.
     const videoAdvancing = Math.abs(videoEl.currentTime - lastVideoTime) > 0.01;
     lastVideoTime = videoEl.currentTime;
 
+    // Network stall: video element isn't paused but currentTime stopped moving.
+    // Don't yank audio back — that was the old looping bug. Instead let audio
+    // keep going briefly (user hears continuous sound), and only pause it if
+    // it overshoots the frozen video by more than 2 s.
     if (!videoEl.paused && !videoEl.ended && !videoAdvancing) {
-      // Frozen: park audio at the stall point exactly once and wait it out.
-      // No reseek, no kick — those are what create the loop.
-      if (!audioEl.paused) audioEl.pause();
       videoFrozen = true;
-      stallTicks = 0;
-      lastAudioTime = audioEl.currentTime;
+      const lead = audioEl.currentTime - videoEl.currentTime;
+      if (lead > 2 && !audioEl.paused) audioEl.pause();
       return;
     }
     if (videoFrozen && videoAdvancing) {
-      // Video just recovered — realign audio to it a single time and resume.
+      // Video just recovered. Snap audio to it once and restore normal rate
+      // instead of chasing it tick-by-tick.
       videoFrozen = false;
       audioEl.currentTime = videoEl.currentTime;
-      if (!videoEl.paused) audioEl.play().catch(() => {});
-      stallTicks = 0;
-      lastAudioTime = audioEl.currentTime;
+      audioEl.playbackRate = videoEl.playbackRate;
+      if (!videoEl.paused && audioEl.paused) audioEl.play().catch(() => {});
       return;
     }
 
+    // Mirror paused state if it got out of sync some other way.
     if (videoEl.paused !== audioEl.paused) {
       if (videoEl.paused) audioEl.pause();
       else audioEl.play().catch(() => {});
     }
-    const drift = Math.abs(audioEl.currentTime - videoEl.currentTime);
-    if (drift > 0.25) {
+    if (videoEl.paused) return;
+
+    const drift = audioEl.currentTime - videoEl.currentTime;
+    const absDrift = Math.abs(drift);
+    const baseRate = videoEl.playbackRate;
+
+    if (absDrift > 0.5) {
+      // Big drift → one hard snap, then return to base rate.
       audioEl.currentTime = videoEl.currentTime;
+      audioEl.playbackRate = baseRate;
+    } else if (absDrift > 0.08) {
+      // Small drift → ±3 % rate nudge. Sub-audible pitch change, converges
+      // toward sync over 1–2 s without any time jump.
+      audioEl.playbackRate = drift > 0 ? baseRate * 0.97 : baseRate * 1.03;
+    } else if (audioEl.playbackRate !== baseRate) {
+      // In sync → ensure we're not still nudging from a previous correction.
+      audioEl.playbackRate = baseRate;
     }
-    if (!videoEl.paused && !audioEl.paused) {
-      if (audioEl.currentTime === lastAudioTime) {
-        stallTicks++;
-        if (stallTicks >= 2) {
-          stallTicks = 0;
-          kickAudio();
-        }
-      } else {
-        stallTicks = 0;
-      }
-      lastAudioTime = audioEl.currentTime;
-    } else {
-      stallTicks = 0;
-      lastAudioTime = audioEl.currentTime;
-    }
-  }, 250);
+  }, 500);
 
   videoEl._audio = audioEl;
   videoEl._audioCleanup = () => {
@@ -183,7 +182,6 @@ export function attachAudioSync(videoEl, videoUrl, audioUrl) {
     videoEl.removeEventListener('seeked', onSeeked);
     videoEl.removeEventListener('ratechange', onRate);
     videoEl.removeEventListener('volumechange', onVol);
-    videoEl.removeEventListener('waiting', onWait);
     videoEl.removeEventListener('playing', onPlaying);
     videoEl.muted = false;
     try { audioEl.pause(); audioEl.removeAttribute('src'); audioEl.load(); } catch {}

@@ -1972,6 +1972,7 @@ async function renderVideo(id) {
         <div class="player-wrap" id="player-wrap">
           <video autoplay playsinline></video>
           <div class="cc-subs" id="cc-subs" aria-hidden="true"></div>
+          <div class="player-spinner" aria-hidden="true"><div class="player-spinner-ring"></div></div>
           <div class="player-bottom-fade"></div>
           <div class="player-heatmap" id="player-heatmap"></div>
           <div class="player-progress-strip">

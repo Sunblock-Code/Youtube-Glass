@@ -3483,6 +3483,41 @@ body.dragging-panel * { cursor: grabbing !important; }
   0%, 100% { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0); }
   50%      { box-shadow: inset 0 0 8px 0 rgba(255, 255, 255, 0.18); }
 }
+
+/* Centre-of-player buffering spinner. Far more obvious than the strip pulse
+   alone (the user reported that buffering was hard to notice — audio cutting
+   out was the only visible signal). Delayed 350 ms via the `.buffering` toggle
+   so quick stalls (<350 ms) don't flash a spinner; once we cross that
+   threshold the ring fades in and stays until `playing`/`canplay`/`seeked`. */
+.player-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 5;
+}
+.player-wrap.buffering .player-spinner {
+  opacity: 1;
+  transition: opacity 0.18s ease 0.35s; /* 350ms delay-in, instant fade-out */
+}
+.player-spinner-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: playerSpin 0.9s linear infinite;
+  filter: drop-shadow(0 0 14px rgba(192, 132, 252, 0.45));
+}
+/* Pause the spin animation when hidden so we don't waste paint cycles. */
+.player-wrap:not(.buffering) .player-spinner-ring { animation-play-state: paused; }
+@keyframes playerSpin {
+  to { transform: rotate(360deg); }
+}
 :root[data-pbstyle="none"]  .player-progress-strip { display: none; }
 :root[data-pbstyle="solid"] .progress-fill { background: var(--pb-color, var(--accent)); }
 /* Style overrides only set glow/colour — NOT height. Heights are owned by the
