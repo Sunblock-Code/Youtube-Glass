@@ -3,3 +3,6 @@ package-lock.json
 .DS_Store
 dist/
 out/
+
+# Personal Claude notes (workflow preferences, not for the repo)
+CLAUDE.local.md
