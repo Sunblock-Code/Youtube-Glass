@@ -138,6 +138,158 @@ body {
 :root[data-bgmode="solid"] .bg::after { display: none; }
 :root[data-bgmode="solid"] .blob { display: none; }
 
+/* Acrylic (Win11 frosted OS backdrop) AND Clear (genuinely transparent
+   window) modes both hide ALL renderer-painted background so the desktop
+   shows through the empty space — blurred for acrylic, sharp for clear.
+   Foreground surfaces stay tinted (opacity = --surface-tint, set from the
+   bgTint slider) so text stays readable over any wallpaper. */
+/* See-through model: the DESKTOP is the background; the UI stays SOLID.
+   Every glass surface paints with var(--glass) — originally a translucent
+   WHITE meant to sit over the dark animated bg. In see-through modes we
+   redefine the glass vars to a near-OPAQUE dark so cards/panels/widgets/
+   titlebar are solid and readable (the transparency was "eating into the
+   UI parts" — exactly what we don't want). The desktop shows only in the
+   genuinely empty space (transparent body + the gaps/margins between
+   surfaces), not THROUGH the content. Surfaces are intentionally NOT tied
+   to the see-through slider — keeping them solid is the whole point. */
+/* Acrylic: surfaces FULLY opaque (the OS material frosts the desktop in the
+   empty space; cards must stay solid). */
+:root[data-bgmode="acrylic"] {
+  --glass: rgb(12, 8, 20);
+  --glass-strong: rgb(17, 11, 28);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.16);
+}
+/* Clear: surfaces are FULLY opaque — the slider must NOT touch the UI. The
+   "Background dim" slider instead controls a veil over the DESKTOP in the
+   empty space (the .bg layer below), leaving every card/panel solid. */
+:root[data-bgmode="clear"] {
+  --glass: rgb(12, 8, 20);
+  --glass-strong: rgb(17, 11, 28);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.16);
+}
+/* Both see-through modes: NO renderer background layer — the empty space is
+   genuinely empty so the desktop (Clear: sharp, via the transparent window)
+   or the Windows OS acrylic material (Acrylic: frosted, composited by the
+   OS into the #00000000 window) shows there. A CSS backdrop-filter frost is
+   impossible — backdrop-filter can't reach the OS desktop behind a window —
+   which is why the earlier CSS-frost attempt looked identical to Clear. */
+:root[data-bgmode="clear"] .bg::after,
+:root[data-bgmode="clear"] .blob,
+:root[data-bgmode="acrylic"] .bg::after,
+:root[data-bgmode="acrylic"] .blob { display: none; }
+/* Clear AND Acrylic: .bg is a flat dark VEIL over the (Clear: sharp /
+   Acrylic: OS-frosted) desktop, sitting BEHIND all UI (z-index 0). Its
+   opacity = the "Background dim" slider. 0 = invisible → the desktop shows
+   exactly as the mode renders it (this is the default, so it can't break
+   the working acrylic); higher = the desktop is progressively darkened.
+   Opaque cards sit on top, so the UI is never affected — only the empty/
+   background space dims. */
+:root[data-bgmode="clear"] .bg,
+:root[data-bgmode="acrylic"] .bg {
+  display: block;
+  background: var(--bg-solid, #0a0612);
+  opacity: var(--clear-bg-tint, 0);
+}
+/* The page itself gets the dark tint (NOT fully transparent). This is the
+   systemic fix for the "glitchy text" — bare text that sits directly on the
+   page (section titles, channel names, the Edit button) had NO opaque
+   backing, and Chromium on Windows renders text over a transparent/acrylic
+   region with broken subpixel antialiasing + repaint artifacts. Giving the
+   page a tinted backing means every element has something behind it, so
+   text is crisp everywhere. See-through still works — it's the alpha of
+   this layer over the desktop (acrylic backdrop or, in Clear mode, the real
+   desktop), tunable with the slider. Uniform tinted glass instead of
+   sharp-but-broken transparency. */
+/* Body stays TRANSPARENT — that's the whole point of see-through. (An
+   earlier attempt tinted the body to back bare text, but that painted over
+   the desktop and defeated see-through entirely. The real text-glitch fix
+   is the grayscale-AA rule below, not an opaque backing.) */
+:root[data-bgmode="acrylic"] body,
+:root[data-bgmode="clear"] body {
+  background: transparent;
+}
+/* Force grayscale antialiasing in these modes — THIS is the actual fix for
+   "glitchy text": subpixel (ClearType) AA produces coloured fringes/garbage
+   over non-opaque pixels; grayscale AA renders cleanly over anything,
+   including straight over the desktop. A soft text-shadow keeps bare labels
+   (section titles, channel names) readable over any wallpaper without
+   needing an opaque box behind them. */
+:root[data-bgmode="acrylic"] *,
+:root[data-bgmode="clear"] * {
+  -webkit-font-smoothing: antialiased !important;
+}
+:root[data-bgmode="acrylic"] body,
+:root[data-bgmode="clear"] body {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.7);
+}
+/* Solid (near-opaque) dark surfaces — by default these stay readable and
+   DON'T let the desktop bleed through the content. Desktop shows only in
+   the empty space around/between them.
+   The alpha is driven by --acrylic-card-alpha (1 = fully solid, lower =
+   more see-through). The user can pull this down via the "Surface
+   see-through" slider in see-through modes to let the OS acrylic /
+   real desktop show through the cards too. */
+:root {
+  --acrylic-card-alpha: 1;
+  --acrylic-blur: 0px;
+}
+:root[data-bgmode="acrylic"] .card,
+:root[data-bgmode="acrylic"] .video-desc-wrap,
+:root[data-bgmode="acrylic"] .channel-row,
+:root[data-bgmode="acrylic"] .comments-list,
+:root[data-bgmode="acrylic"] .related .row,
+:root[data-bgmode="clear"] .card,
+:root[data-bgmode="clear"] .video-desc-wrap,
+:root[data-bgmode="clear"] .channel-row,
+:root[data-bgmode="clear"] .comments-list,
+:root[data-bgmode="clear"] .related .row {
+  background-color: rgba(12, 8, 20, var(--acrylic-card-alpha, 1));
+}
+:root[data-bgmode="acrylic"] .titlebar,
+:root[data-bgmode="clear"] .titlebar {
+  background-color: rgba(12, 8, 20, var(--acrylic-card-alpha, 1));
+}
+/* Video stays solid black in both — a see-through video would look wrong. */
+:root[data-bgmode="acrylic"] .player-wrap,
+:root[data-bgmode="clear"] .player-wrap {
+  background-color: #000;
+}
+/* CRITICAL for these modes: kill ALL backdrop-filter by default. The
+   renderer-painted background is hidden (above), so blurring "what's behind"
+   a surface is pointless here — and a translucent + backdrop-blurred surface
+   sitting over the OS acrylic backdrop forces Chromium to re-rasterize that
+   whole stack every frame while scrolling/animating. That triple-composite
+   is exactly the "super glitchy" smearing/flicker. With it off, the
+   see-through comes purely from the OS backdrop showing through the empty
+   space + the tint alpha — composited once, smooth. */
+:root[data-bgmode="acrylic"] *,
+:root[data-bgmode="clear"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* OPT-IN re-enable: when the user pulls the "Blur" slider above 0, the
+   specific surfaces below get backdrop-filter back so the see-through
+   desktop behind them is frosted by our chosen amount. Scoped to the
+   handful of surfaces that can become translucent — NOT the blanket
+   * selector — so the perf cost is bounded to just those layers. */
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .card,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .video-desc-wrap,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .channel-row,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .comments-list,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .related .row,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .titlebar,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .card,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .video-desc-wrap,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .channel-row,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .comments-list,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .related .row,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .titlebar {
+  backdrop-filter: blur(var(--acrylic-blur, 0px)) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(var(--acrylic-blur, 0px)) saturate(140%) !important;
+}
+
 /* Frosted glass material — purely a renderer effect (no OS backdrop). Adds a
    heavy blur+saturate to the .bg and pushes glass surfaces to a more pronounced
    crystalline look. Pair with the See-through slider for genuine see-through. */
@@ -246,8 +398,12 @@ body {
   50%      { filter: drop-shadow(0 0 12px rgba(216, 180, 254, 0.65)); }
 }
 
-/* Allow brand to be wider since it now needs more room */
-.titlebar { grid-template-columns: auto auto 1fr auto; }
+/* Allow brand to be wider since it now needs more room.
+   5 tracks: brand · back · forward · search(stretch) · topnav. The forward
+   button added a 5th child — without a matching track the grid put forward
+   into the 1fr (stretch) slot, ballooning it and shoving the search box +
+   nav out of place ("buttons all fucked up"). */
+.titlebar { grid-template-columns: auto auto auto 1fr auto; }
 .brand { padding: 4px 8px; gap: 11px; }
 
 .back-btn {
@@ -603,6 +759,27 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 }
 .card .sub { font-size: 12px; color: var(--muted); }
 
+/* Channel name + view-count line — used in home cards, related sidebar,
+   shorts strip, etc. The channel name (.ch) is brighter and slightly
+   heavier than the surrounding muted line so it's the eye-catcher; the
+   dot separator is dimmed to a quiet spacer so it doesn't compete. */
+.sub .ch {
+  color: #d9d2f0;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+.sub .dot {
+  display: inline-block;
+  margin: 0 6px;
+  color: rgba(155, 148, 179, 0.55);
+  font-weight: 400;
+}
+.card:hover .sub .ch,
+.related .row:hover .sub .ch,
+.shorts-row:hover .sub .ch {
+  color: var(--accent);
+}
+
 /* --- Watch page --- */
 .player-page {
   display: grid;
@@ -638,7 +815,20 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  /* Symmetric horizontal padding so hover effects (box-shadow / outline /
+     scale) on the leftmost edge of cards aren't clipped by the scroll
+     container. overflow-y: auto implicitly forces overflow-x clipping too,
+     and without this padding the LEFT side of every hover ring disappears
+     while top / right / bottom render correctly — long-standing bug. */
+  padding-left: 4px;
   padding-right: 4px;
+  /* Top breathing room so the first item never butts against the scroll
+     container's top edge — without this the first thumbnail can appear
+     cropped at the top whenever the chrome above (related-tabs +
+     related-header) reflows or the user lands at scroll top after a
+     partial scroll. Bottom padding so the last row isn't flush either. */
+  padding-top: 4px;
+  padding-bottom: 8px;
   /* Don't bubble wheel events to the page — keeps the side panels' positions
      and scroll state stable when the user scrolls the description / video. */
   overscroll-behavior: contain;
@@ -708,7 +898,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
    spans both rows on the right and comments sits IMMEDIATELY under the
    player column, instead of in a separate row stretched to up-next height. */
 .player-page[data-cmode-below] {
-  grid-template-rows: auto auto;
+  /* min-content keeps row 1 sized strictly to player-col's natural height.
+     With plain `auto`, the related-col spanning rows 1/2 (height: calc(100vh
+     - 80px)) would stretch row 1 to absorb its excess height — leaving a
+     huge empty gap between the description and the comments banner whenever
+     the player column was shorter than the viewport. */
+  grid-template-rows: min-content min-content;
   /* row-gap 0 so the comments-col margin-top is the only spacing between the
      description and the comments dropdown — matches channel-row → desc gap */
   row-gap: 0;
@@ -838,6 +1033,21 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      leaves a tall comments column on the left of a much shorter video,
      so the whole right side of the screen below the description ends up
      as dead space — what the user reported. */
+  /* min-content rows + spanning the related sidebar across both rows is the
+     same trick used by data-cmode-below — without it, the related-col's
+     `height: calc(100vh - 80px)` would stretch row 1 to viewport height,
+     leaving a huge empty gap between the description and the comments panel
+     (which lives in row 2). row-gap 0 leaves the comments-col's margin-top
+     as the only spacing between the two. */
+  :root[data-comments="auto"]  .player-page,
+  :root[data-comments="side"]  .player-page {
+    grid-template-rows: min-content min-content;
+    row-gap: 0;
+  }
+  :root[data-comments="auto"]  .player-page > .related-col,
+  :root[data-comments="side"]  .player-page > .related-col {
+    grid-row: 1 / span 2;
+  }
   :root[data-comments="auto"]  .player-page > .comments-col,
   :root[data-comments="side"]  .player-page > .comments-col {
     grid-column: 1;
@@ -927,17 +1137,75 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   min-width: 0;
 }
 
+/* Narrow window (e.g. the Alt+T slide-out dock): the forced "side" 3-column
+   layout above applies at ALL widths and can't fit a skinny window — the
+   columns overlap / overflow and lists break. Below 1000px, collapse every
+   forced multi-column player layout back to a single stacked column so it
+   fits the dock. Same specificity as the rules above + later source + inside
+   a media query, so it wins only when the window is actually narrow. */
+@media (max-width: 1000px) {
+  :root[data-comments="side"] .player-page,
+  :root[data-comments="side"] .player-page.comments-collapsed,
+  :root[data-comments="side"] .player-page.comments-collapsed.related-collapsed,
+  :root[data-comments="side"] .player-page.related-collapsed:not(.comments-collapsed),
+  :root[data-comments="below"] .player-page,
+  :root[data-comments="below"] .player-page.related-collapsed {
+    grid-template-columns: 1fr;
+  }
+  :root[data-comments="side"] .player-page > .comments-col,
+  :root[data-comments="below"] .player-page > .comments-col,
+  .player-page > .related-col {
+    position: static;
+    height: auto;
+    max-height: none;
+    grid-column: 1;
+  }
+  :root[data-comments="side"] .player-page > .related-col .related,
+  .player-page > .comments-col .comments-list { overflow-y: visible; }
+  /* Tighter page padding + smaller card grid so nothing overflows the dock. */
+  main { padding: 16px 18px 24px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+}
+
 /* --- Comments panel --- */
+/* Sticky wrapper around the header + composer + filters so the entire
+   "comments chrome" stays pinned at the top of the column while the comment
+   list scrolls underneath. The glass backdrop + blur make text underneath
+   readable when it scrolls behind. The wrapper handles its own padding;
+   children inside drop their old position:sticky declarations since the
+   wrapper now owns that behaviour. */
+.comments-stickyhead {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  /* OPAQUE on purpose — no backdrop-filter. A sticky element with
+     backdrop-filter forces the compositor to re-rasterize the blurred
+     region every frame as comments scroll behind it (made far worse by
+     the always-animating background blobs), which is what made the
+     comments column smear and glitch while scrolling. An opaque
+     background needs nothing read back from behind it, so the header
+     just composites once and scrolling stays smooth. */
+  background: linear-gradient(to bottom,
+              rgb(22, 14, 32) 0%,
+              rgb(20, 12, 30) 100%);
+  border-bottom: 1px solid var(--glass-border);
+  /* Extend the chrome wider than the column's content area: negative
+     horizontal margin pulls the box outward, matching horizontal padding
+     puts the content (title, composer, filters) back in the same place
+     so only the BACKGROUND grows. The 14px overhang fits inside the
+     20px grid-gap to either side, so it doesn't bleed into adjacent
+     columns. */
+  padding: 8px 14px 10px;
+  margin: 0 -14px 8px;
+  box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.55);
+}
 .comments-header {
   display: flex;
   align-items: center;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   gap: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 6;
   background: transparent;
-  padding: 6px 0 10px;
+  padding: 0;
 }
 /* Below-description dropdown owns its own header layout — keep it static. */
 .player-page[data-cmode-below] > .comments-col .comments-header {
@@ -974,11 +1242,14 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  padding: 10px 14px;
+  /* 4px side margin lines the box up with the comment rows below (the
+     comments-list has 4px horizontal padding), so the composer is the
+     SAME width as the comments. Bigger radius = clearly rounded. */
+  margin: 0 4px 10px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
+  border-radius: 16px;
   transition: border-color 0.15s, background 0.15s;
 }
 .comment-composer:focus-within,
@@ -1059,18 +1330,15 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   box-shadow: 0 2px 8px rgba(192, 132, 252, 0.35);
 }
 
-/* Sort filter pills under the Comments header — also sticky, anchored just
-   under the header so they don't get covered by scrolling comment text. */
+/* Sort filter pills under the Comments header. No longer individually
+   sticky — the .comments-stickyhead wrapper above pins the whole header
+   block (header + composer + filters) as a unit. */
 .comment-filters {
   display: flex;
   gap: 6px;
-  padding: 0 0 12px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 0;
+  margin: 0;
   flex-wrap: wrap;
-  position: sticky;
-  top: 44px;     /* sits below .comments-header (≈ its rendered height) */
-  z-index: 5;
   background: transparent;
 }
 .comment-filter {
@@ -1157,6 +1425,66 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex-shrink: 0;
 }
 .related-header .section-title { margin: 0; flex: 1; }
+/* Spacer between #related-merge (left) and #related-layout/#related-toggle
+   (right) — keeps them anchored to opposite ends of the action row now that
+   the tabs have moved to their own row above. */
+.related-header-spacer { flex: 1; }
+
+/* Sidebar source segmented control: Up next / Subs / History. Styled to
+   match the merged-panel .panel-tab look (no container chrome — each tab
+   is bare text, the active one gets the accent-soft pill highlight) so
+   the two tab bars in the app feel consistent. */
+.related-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 8px;
+  margin: 0;
+  border-bottom: 1px solid var(--glass-border);
+  align-items: center;
+}
+.related-tab {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.15s;
+}
+.related-tab:hover { color: var(--text); background: var(--glass); }
+.related-tab.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.40);
+}
+/* Hide tabs in collapsed states — they belong to the expanded sidebar only.
+   Mirrors the existing rules that hide .section-title when the panel sliver
+   collapses or the merged-panel sliver shrinks. */
+.player-page.related-collapsed .related-tabs,
+.player-page.merged-collapsed .related-tabs { display: none; }
+
+/* Empty-state message inside the sidebar list (no related / no history /
+   no subs). Smaller and dimmer than the page-level .empty so it sits well
+   in the narrow sidebar. */
+.related .empty-mini {
+  padding: 24px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.45;
+}
+
 .related-toggle {
   /* Rounded-square instead of full circle: cleaner, more uniform with the
      rest of the chrome, and the square icons inside no longer have to fight
@@ -1173,6 +1501,19 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   justify-content: center;
   padding: 0;
   transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+/* Collapse chevrons — no chrome, just the icon, matching the cleaner look
+   shown in the user reference screenshot. The other related-toggle buttons
+   (merge/layout) keep the rounded-square frame. Applied to BOTH the
+   related and comments collapse chevrons so they match. */
+#related-toggle,
+#comments-toggle {
+  background: transparent;
+  border: none;
+}
+#related-toggle:hover,
+#comments-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 .related-toggle:hover {
   background: var(--glass-strong);
@@ -1676,6 +2017,56 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 }
 .dash-empty button:hover { filter: brightness(1.08); }
 
+/* Home feed mode switcher (Mixed / Trending / For You / Dashboard) — flat
+   matte segmented group with a sliding indicator. The indicator is an
+   absolutely-positioned element behind the buttons; on tab change it
+   slides from the previously active button to the newly active one. */
+.home-modebar {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: rgba(18, 12, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  width: fit-content;
+}
+.home-mode-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  transition:
+    transform 0.42s cubic-bezier(0.5, 0.05, 0.2, 1.15),
+    width 0.42s cubic-bezier(0.5, 0.05, 0.2, 1.15),
+    height 0.42s cubic-bezier(0.5, 0.05, 0.2, 1.15);
+  z-index: 0;
+  pointer-events: none;
+}
+.home-modebtn {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 9px;
+  transition: color 0.22s ease;
+}
+.home-modebtn:hover { color: var(--text); }
+.home-modebtn.active {
+  color: #fff;
+}
+
 .dash-edit-banner {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px;
@@ -1793,11 +2184,22 @@ input[type="checkbox"].glass-check:checked::after {
 .modal-card.settings {
   width: 880px;
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 80px);
+  /* DEFINITE height (not just max-height) so the flex column always has a
+     concrete size for the inner panes to scroll within. Extra clearance
+     (96px) so the centred card never reaches the screen edges and the
+     Reset/Done footer always has room below it. */
+  height: min(720px, calc(100vh - 96px));
   padding: 24px 24px 18px;
   display: flex;
   flex-direction: column;
   margin: auto;     /* belt-and-braces vertical centring inside the flex parent */
+}
+/* The scrolling area is the ONLY flexible part; the footer is a reserved
+   row that never shrinks or gets pushed out of the card. */
+.modal-card.settings .settings-body { flex: 1 1 0; min-height: 0; }
+.modal-card.settings .modal-actions {
+  flex: 0 0 auto;
+  margin-top: 16px;
 }
 /* No darkening / blur backdrop when the settings modal is open — the user
    should see the app behind it cleanly. */
@@ -1858,7 +2260,10 @@ input[type="checkbox"].glass-check:checked::after {
   overflow: hidden;
   padding-right: 0;
   margin-right: 0;
-  min-height: 360px;
+  /* min-height:0 (NOT a 360px floor) so this flex child can shrink inside a
+     short modal and hand the overflow to the scrolling panes instead of
+     forcing the card taller than the window. */
+  min-height: 0;
 }
 .settings-tabs {
   flex: 0 0 180px;
@@ -1909,6 +2314,7 @@ input[type="checkbox"].glass-check:checked::after {
 .settings-panes {
   flex: 1;
   min-width: 0;
+  min-height: 0;          /* allow shrink so overflow-y actually scrolls */
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -1960,13 +2366,33 @@ input[type="checkbox"].glass-check:checked::after {
   color: #e9e4ff;
   margin: 14px 0 8px;
 }
+/* Settings value badge — small chip next to a slider showing the current
+   value (e.g. "100%", "20px"). Rounded-square (not pill/oval) so the
+   numbers read as a tidy readout chip, with a glassy accent glow. */
 .settings-label .val {
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: linear-gradient(135deg,
+              rgba(0, 0, 0, 0.45) 0%,
+              rgba(20, 12, 30, 0.55) 100%);
+  border: 1px solid var(--accent);
+  color: white;
   font-weight: 700;
-  letter-spacing: 0;
+  font-size: 11px;
+  letter-spacing: 0.4px;
   text-transform: none;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 0 10px var(--accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  text-shadow: 0 0 6px var(--accent-soft);
+  transition: border-color 0.15s ease, box-shadow 0.2s ease;
 }
 .settings-label .hint,
 .pullout-grid .hint {
@@ -2021,6 +2447,32 @@ input[type="checkbox"].glass-check:checked::after {
   margin: 0 0 6px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
+.settings-restart-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(244, 114, 182, 0.10);
+  border: 1px solid rgba(244, 114, 182, 0.28);
+  border-radius: 10px;
+}
+.settings-restart-note button {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #ec4899);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.settings-restart-note button:hover { filter: brightness(1.08); }
 .settings-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -2333,7 +2785,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   color: var(--text);
   z-index: 5;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  animation: resumeIn 0.25s ease-out;
+  /* Opacity-only fade — no vertical slide. The old `resumeIn` slid the
+     banner downward, which (because it appeared while the video was still
+     a black loading frame) looked like a stray rectangle dropping in
+     behind the video. It now just fades in place. */
+  animation: resumeFade 0.2s ease-out;
 }
 .resume-banner strong { color: var(--accent); font-weight: 600; margin: 0 2px; }
 .resume-banner button {
@@ -2355,12 +2811,46 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-weight: 600;
 }
 .resume-banner button.primary:hover { filter: brightness(1.08); }
-.resume-banner.fading { opacity: 0; transform: translate(-50%, -8px); transition: all 0.3s; }
-@keyframes resumeIn {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+.resume-banner.fading { opacity: 0; transition: opacity 0.3s; }
+@keyframes resumeFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .player-wrap video { width: 100%; height: 100%; display: block; background: #000; cursor: pointer; }
+
+/* Draggable caption overlay. Replaces native ::cue rendering so the user can
+   drag captions anywhere on the video. Position ({x,y} fraction of the
+   player) is set inline as left/top %, with translate(-50%,-50%) so those
+   coordinates address the box CENTRE. Empty by default and pointer-inert so
+   it never blocks click-to-pause; only grabbable once it has text. */
+.cc-subs {
+  position: absolute;
+  left: 50%;
+  top: 88%;
+  transform: translate(-50%, -50%);
+  max-width: 86%;
+  z-index: 4;                 /* above bottom-fade(2)/strip(3), below cc-bar(5) */
+  margin: 0;
+  padding: 0.18em 0.55em;
+  display: none;
+  white-space: pre-line;      /* honour the \n we join multi-line cues with */
+  text-align: center;
+  font-size: clamp(15px, 2.6vw, 30px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 6px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  user-select: none;
+  cursor: grab;
+  -webkit-user-select: none;
+}
+.cc-subs.has-text { display: block; pointer-events: auto; }
+.cc-subs.has-text:hover { outline: 1px dashed rgba(255, 255, 255, 0.45); }
+.cc-subs.dragging { cursor: grabbing; outline: 1px solid var(--accent); opacity: 0.92; }
+:root[data-motion="off"] .cc-subs { transition: none; }
 
 /* --- Custom video controls bar --- */
 .cc-bar {
@@ -2422,19 +2912,88 @@ body.dragging-panel * { cursor: grabbing !important; }
 .player-wrap.playing #cc-play .cc-icon-play  { display: none; }
 .player-wrap.playing #cc-play .cc-icon-pause { display: block; }
 
+/* Play/pause — cool icy halo on hover and a gentle glow while playing. */
+#cc-play {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  transition: background 0.18s ease, transform 0.1s ease, box-shadow 0.22s ease;
+}
+#cc-play::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center,
+              rgba(103, 232, 249, 0.55) 0%,
+              rgba(59, 130, 246, 0.30) 50%,
+              transparent 78%);
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+#cc-play:hover {
+  background: rgba(103, 232, 249, 0.10);
+  box-shadow:
+    0 0 0 1px rgba(125, 211, 252, 0.40),
+    0 4px 16px rgba(56, 189, 248, 0.45);
+}
+#cc-play:hover::before { opacity: 1; transform: scale(1.15); }
+#cc-play svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+  transition: filter 0.22s ease, transform 0.18s ease;
+}
+#cc-play:hover svg {
+  filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.85))
+          drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  transform: scale(1.08);
+}
+.player-wrap.playing #cc-play svg {
+  filter: drop-shadow(0 0 5px rgba(125, 211, 252, 0.55))
+          drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
 /* Toggle volume icons based on muted */
 #cc-mute .cc-icon-vol-off { display: none; }
 .player-wrap.muted #cc-mute .cc-icon-vol-on  { display: none; }
 .player-wrap.muted #cc-mute .cc-icon-vol-off { display: block; }
 
+/* Time readout — glassy pill with a cool-tinted border and a soft glow on
+   the digits. The slash is dimmed so the current/total numbers read first. */
 .cc-time {
-  color: white;
+  color: #f1f9ff;
   font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.3px;
-  padding: 0 6px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  margin: 0 2px;
+  border-radius: 8px;
+  background: linear-gradient(135deg,
+              rgba(15, 30, 56, 0.55) 0%,
+              rgba(30, 41, 80, 0.45) 100%);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.45);
+  text-shadow:
+    0 0 10px rgba(125, 211, 252, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+              text-shadow 0.2s ease;
+}
+.player-wrap:hover .cc-time {
+  border-color: rgba(125, 211, 252, 0.40);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 2px 10px rgba(56, 189, 248, 0.30);
+  text-shadow:
+    0 0 12px rgba(125, 211, 252, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .cc-spacer { flex: 1; }
 
@@ -2510,6 +3069,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-transform: uppercase; letter-spacing: 1.2px;
   color: var(--muted);
   margin-bottom: 8px;
+}
+.cc-opt-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
 }
 /* Side-by-side row used for Resolution + Subtitles dropdowns. Saves vertical
    space so the popover doesn't get cut off at the bottom of short players. */
@@ -2630,62 +3194,43 @@ body.dragging-panel * { cursor: grabbing !important; }
 .dl-btn > *,
 .sub-btn > * { position: relative; z-index: 2; }
 
-/* Gradient sheen — fades in on hover behind the label. */
+/* Subtle accent-tinted wash that fades in on hover. Theme-aware via the
+   accent CSS variable so the same hover reads naturally in every theme
+   (purple, ocean, sunset, etc.) instead of being hard-coded cyan.
+   z-index: -1 so the wash paints BEHIND in-flow text. The button has
+   `isolation: isolate` so the negative z-index stays inside its own
+   stacking context. Without this, bare text content (e.g. the
+   "Subscribed" label) gets covered by the ::before overlay on hover. */
 .dl-btn::before,
 .sub-btn::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  z-index: 0;
-}
-/* Conic-gradient border ring — appears on hover and rotates for a subtle
-   "alive" feel without being noisy. Sits above the bg, below the label. */
-.dl-btn::after,
-.sub-btn::after {
-  content: '';
-  position: absolute;
   inset: -1px;
   border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(from 0deg, var(--accent), #ec4899, #60a5fa, var(--accent));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
+  background: linear-gradient(135deg,
+              var(--accent-soft) 0%,
+              rgba(255, 255, 255, 0.04) 100%);
   opacity: 0;
-  transition: opacity 0.25s ease;
-  z-index: 1;
-  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: -1;
 }
 .dl-btn:hover,
 .sub-btn:hover {
   transform: translateY(-1px);
-  border-color: transparent;
+  background: rgba(255, 255, 255, 0.10);
+  border-color: var(--accent);
   color: white;
   box-shadow:
-    0 6px 22px rgba(192, 132, 252, 0.40),
-    0 0 0 1px rgba(192, 132, 252, 0.20);
+    0 6px 18px rgba(0, 0, 0, 0.30),
+    0 0 0 1px var(--accent),
+    0 0 14px var(--accent-soft);
 }
 .dl-btn:hover::before,
-.sub-btn:hover::before { opacity: 0.85; }
-.dl-btn:hover::after,
-.sub-btn:hover::after {
-  opacity: 1;
-  animation: btnRingSpin 4s linear infinite;
-}
-@keyframes btnRingSpin {
-  from { filter: hue-rotate(0deg); }
-  to   { filter: hue-rotate(360deg); }
-}
+.sub-btn:hover::before { opacity: 1; }
 .dl-btn:hover svg {
-  animation: dlBounce 1s ease-in-out infinite;
-}
-@keyframes dlBounce {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(2px); }
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent-soft));
+  transition: color 0.2s ease, filter 0.2s ease;
 }
 .dl-btn:active,
 .sub-btn:active {
@@ -2781,7 +3326,10 @@ body.dragging-panel * { cursor: grabbing !important; }
 
 /* --- "Most Replayed" heatmap curve (YouTube-style) ---
    Sits directly on top of the progress strip. Hidden at rest, fades in only
-   when the user hovers the player so the video isn't visually cluttered. */
+   when the user hovers the player so the video isn't visually cluttered. The
+   inner SVG uses currentColor for stroke + gradient stops, so this element's
+   `color` is what tints the curve — we point it at --pb-color (falling back
+   to the theme accent) so the heatmap stays cohesive with the playbar. */
 .player-heatmap {
   position: absolute;
   left: 0; right: 0;
@@ -2790,12 +3338,20 @@ body.dragging-panel * { cursor: grabbing !important; }
   z-index: 4;
   pointer-events: none;
   opacity: 0;
+  color: var(--pb-color, var(--accent));
+  /* Soft accent-tinted glow under the curve — gives it depth without clipping
+     against the progress strip below. */
+  filter: drop-shadow(0 0 6px var(--pb-color, var(--accent)))
+          drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
   transition: opacity 0.25s ease, height 0.18s ease;
 }
-.player-heatmap svg { width: 100%; height: 100%; display: block; }
+.player-heatmap svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .player-heatmap:empty { display: none; }
 :root[data-heatmap="off"] .player-heatmap { display: none !important; }
 .player-wrap:hover .player-heatmap { opacity: 1; }
+/* Rainbow playbar style has no single colour to tint with — fall back to a
+   neutral white tint so the curve still reads against the video. */
+:root[data-pbstyle="rainbow"] .player-heatmap { color: rgba(255, 255, 255, 0.92); }
 
 /* --- Custom themed progress strip at the very bottom of the player --- */
 .player-progress-strip {
@@ -2834,16 +3390,17 @@ body.dragging-panel * { cursor: grabbing !important; }
 /* --- Seek preview tooltip ---
    Floating bubble above the progress strip with a thumbnail (secondary
    <video> seeked to the hover position) plus the timestamp.
-   --seek-x is set from JS on mousemove and clamped so the preview can't
-   slide off the player edge. */
+   --seek-x is the cursor X within the player-wrap; the JS that sets it also
+   clamps it so the preview can't slide off the player edge. We position the
+   preview with `left: var(--seek-x)` and shift it -50% so it centres on the
+   cursor — using a transform-only translate with `100%` would resolve against
+   the preview's own box (120px), not the player, which is why an earlier
+   `clamp(…, 100% - 120px)` collapsed to zero and pinned the preview left. */
 .seek-preview {
   position: absolute;
-  left: 0;
+  left: var(--seek-x, 0px);
   bottom: calc(var(--pb-h-hover, 12px) + 14px);
-  transform: translate(
-    clamp(0px, calc(var(--seek-x, 0px) - 60px), calc(100% - 120px)),
-    0
-  );
+  transform: translateX(-50%);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -2896,11 +3453,35 @@ body.dragging-panel * { cursor: grabbing !important; }
   white-space: nowrap;
 }
 .player-wrap:hover .player-progress-strip { height: var(--pb-h-hover, 12px); }
+/* Buffered-range bar — sits behind .progress-fill so the playhead fill
+   visually overlays it. Renders the leading edge of how much of the video
+   the browser has preloaded; lets the user see that buffering is making
+   progress even when playback itself is stalled. */
+.progress-buffered {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  height: 100%;
+  width: 0%;
+  background: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
 .progress-fill {
+  position: relative;
   height: 100%;
   background: var(--pb-color, var(--accent));
   width: 0%;
-  transition: width 0.12s linear;
+  /* No `transition` — width is now updated every animation frame from JS,
+     so a transition would lag a frame behind and produce jitter. */
+}
+/* Buffering state — soft pulsing glow on the strip to signal the player is
+   alive and waiting on bytes. Kicked on by `waiting`/`stalled` events,
+   cleared by `playing`/`canplay`/`seeked`. */
+.player-wrap.buffering .player-progress-strip {
+  animation: pbBuffer 1.2s ease-in-out infinite;
+}
+@keyframes pbBuffer {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0); }
+  50%      { box-shadow: inset 0 0 8px 0 rgba(255, 255, 255, 0.18); }
 }
 :root[data-pbstyle="none"]  .player-progress-strip { display: none; }
 :root[data-pbstyle="solid"] .progress-fill { background: var(--pb-color, var(--accent)); }
@@ -3138,12 +3719,29 @@ body.dragging-panel * { cursor: grabbing !important; }
   white-space: nowrap;
   font-size: 13px;
   color: var(--muted);
-  padding-top: 6px;
-  text-align: right;
+  padding-top: 8px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.005em;
+}
+.title-row .stats .stat b {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 3px;
+}
+.title-row .stats .stat-time {
+  opacity: 0.85;
+}
+.title-row .stats .stat-sep {
+  opacity: 0.35;
+  font-weight: 400;
+  user-select: none;
 }
 @media (max-width: 800px) {
   .title-row { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .title-row .stats { padding-top: 0; text-align: left; }
+  .title-row .stats { padding-top: 0; }
 }
 
 .channel-row {
@@ -3258,6 +3856,72 @@ body.dragging-panel * { cursor: grabbing !important; }
   overflow: hidden;
   white-space: pre-wrap;
 }
+
+.channel-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.channel-filter {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.channel-filter:hover {
+  color: var(--text);
+  border-color: var(--glass-border-strong);
+}
+.channel-filter.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 16px var(--accent-soft);
+}
+
+.channel-loadmore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+.loadmore-btn {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 999px;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.loadmore-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 18px var(--accent-soft);
+}
+.loadmore-btn:active:not(:disabled) { transform: scale(0.98); }
+.loadmore-btn:disabled { opacity: 0.6; cursor: default; }
+.loadmore-btn[hidden] { display: none; }
+.loadmore-status {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 1em;
+}
 /* Old pill-style block was here — removed in favour of the unified
    .dl-btn / .sub-btn rounded-square block higher up. Only the
    margin-left:auto and the subscribed-state look stay. */
@@ -3269,17 +3933,35 @@ body.dragging-panel * { cursor: grabbing !important; }
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: none;
 }
-.sub-btn.subbed::before { opacity: 0; }
-.sub-btn.subbed:hover {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: var(--text);
-  /* Suppress the gradient sheen for the "already subscribed" state — it's a
-     destructive action (unsubscribe), shouldn't read as the primary CTA. */
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+.sub-btn.subbed::before {
+  /* Cooler, more restrained icy fill for the "already subscribed" state —
+     same family as the primary hover but desaturated so unsubscribe
+     doesn't read as a vibrant CTA. */
+  background: linear-gradient(135deg, #0e7490 0%, #1e40af 100%);
+  opacity: 0;
 }
-.sub-btn.subbed:hover::before { opacity: 0; }
-.sub-btn.subbed:hover::after { opacity: 0; }
+.sub-btn.subbed:hover {
+  background: linear-gradient(135deg, #0e7490 0%, #1e40af 100%);
+  border-color: rgba(125, 211, 252, 0.55);
+  /* Force a strong white that survives the ::before gradient overlay, plus
+     a dark text-shadow so the label reads against the cyan/blue wash —
+     without it the text was nearly invisible against the gradient. */
+  color: #ffffff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 0 8px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 8px 24px rgba(14, 116, 144, 0.45),
+    0 0 0 1px rgba(125, 211, 252, 0.45);
+}
+/* Ensure the wrapping <span> inherits the explicit white — some specificity
+   paths (e.g. .sub-btn > * cascade) can otherwise leave it at the resting
+   var(--text) shade once the overlay paints. */
+.sub-btn.subbed:hover > * {
+  color: #ffffff;
+}
+.sub-btn.subbed:hover::before { opacity: 1; }
+.sub-btn.subbed:hover::after { opacity: 1; }
 
 .video-desc-wrap {
   margin-top: 16px;
@@ -3328,8 +4010,23 @@ body.dragging-panel * { cursor: grabbing !important; }
   word-wrap: break-word;
   overscroll-behavior: contain;
 }
-.video-desc .desc-link { color: var(--accent); text-decoration: none; cursor: pointer; }
-.video-desc .desc-link:hover { text-decoration: underline; }
+/* In-text links — bright cool tone with a soft underline so they're easy
+   to spot against the dim description text without screaming. */
+.video-desc .desc-link {
+  color: #7dd3fc;
+  text-decoration: underline;
+  text-decoration-color: rgba(125, 211, 252, 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease,
+              text-shadow 0.15s ease;
+}
+.video-desc .desc-link:hover {
+  color: #a5f3fc;
+  text-decoration-color: #67e8f9;
+  text-shadow: 0 0 10px rgba(103, 232, 249, 0.45);
+}
 
 .related { display: flex; flex-direction: column; gap: 8px; }
 .related .row {
@@ -3405,6 +4102,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-size: 10px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
+/* In overlay mode the .sub sits on the dark thumbnail gradient — keep the
+   channel-name brighter than the view-count so it still pops over the
+   bright spots of a thumbnail. */
+.related[data-mode="overlay"] .row .sub .ch { color: #ffffff; }
+.related[data-mode="overlay"] .row .sub .dot { color: rgba(255, 255, 255, 0.5); }
 .related[data-mode="overlay"] .row:hover .thumb { box-shadow: 0 0 0 2px var(--accent); }
 
 .related[data-mode="thumbs"] .row {
@@ -3478,6 +4180,53 @@ body.dragging-panel * { cursor: grabbing !important; }
     transform: scale(1.15);
     box-shadow: 0 0 18px var(--accent), 0 0 36px var(--accent);
   }
+}
+
+/* Hold-R refresh ring — centred overlay that fills as the key is held. */
+.refresh-ring {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.82);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 9999;
+}
+.refresh-ring.show { opacity: 1; transform: scale(1); }
+.refresh-ring > svg:first-child {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+}
+.refresh-ring .rr-track {
+  fill: rgba(10, 6, 18, 0.72);
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 4;
+}
+.refresh-ring .rr-prog {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform: rotate(-90deg);          /* start the fill at 12 o'clock */
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+.refresh-ring.done .rr-prog {
+  stroke: #4ade80;
+  filter: drop-shadow(0 0 8px #4ade80);
+}
+.refresh-ring .rr-glyph {
+  width: 28px;
+  height: 28px;
+  color: var(--text);
+  opacity: 0.92;
 }
 
 .error {
@@ -3563,6 +4312,27 @@ body.dragging-panel * { cursor: grabbing !important; }
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* See-through modes (acrylic/clear): modals MUST be opaque and MUST sit on a
+   real dim. Normally the modal card's backdrop-blur fakes solidity and the
+   Settings modal deliberately uses a transparent backdrop ("see the app
+   behind it"). But here the app behind is the see-through page (desktop +
+   video thumbnails) and backdrop-filter is force-disabled — so an 85%
+   card + transparent backdrop became an unreadable sheet floating over
+   chaos. Higher specificity + !important + later source order beats the
+   transparent-backdrop rule above. */
+:root[data-bgmode="acrylic"] .modal-card,
+:root[data-bgmode="clear"] .modal-card {
+  background: rgb(20, 12, 30) !important;
+}
+:root[data-bgmode="acrylic"] .modal-bg,
+:root[data-bgmode="clear"] .modal-bg,
+:root[data-bgmode="acrylic"] .modal.settings-open .modal-bg,
+:root[data-bgmode="clear"] .modal.settings-open .modal-bg,
+:root[data-bgmode="acrylic"] .modal:has(.modal-card.settings) .modal-bg,
+:root[data-bgmode="clear"] .modal:has(.modal-card.settings) .modal-bg {
+  background: rgba(4, 2, 8, 0.88) !important;
 }
 
 .modal h2 {
@@ -3902,11 +4672,12 @@ body.dragging-panel * { cursor: grabbing !important; }
 .dl-folder-input {
   flex: 1;
   min-width: 0;
-  height: 34px;
+  height: 38px;
   padding: 0 12px;
   border-radius: 9px;
   background: var(--glass);
-  border: 1px solid var(--glass-border);
+  /* Clear white outline so the field reads as an editable box. */
+  border: 1px solid rgba(255, 255, 255, 0.45);
   color: var(--text);
   font: inherit;
   font-size: 12px;
@@ -3914,8 +4685,26 @@ body.dragging-panel * { cursor: grabbing !important; }
   letter-spacing: 0.2px;
   cursor: default;
 }
-.dl-folder-input:focus { outline: none; border-color: var(--accent); }
-.dl-folder-row .theme-pill { height: 34px; }
+/* Readable example/placeholder text (was faint browser-default grey). */
+.dl-folder-input::placeholder { color: rgba(255, 255, 255, 0.6); opacity: 1; }
+.dl-folder-input:focus { outline: none; border-color: #ffffff; }
+/* All three controls exactly the same height. Higher specificity than
+   `.settings-section .theme-pill` (28px) so it actually wins. */
+.settings-section .dl-folder-row .theme-pill {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 11px;
+}
+/* Reset = slightly red (it discards the chosen folder). */
+.dl-folder-row #s-dldir-reset {
+  color: #fca5a5;
+  border-color: rgba(244, 114, 182, 0.42);
+}
+.dl-folder-row #s-dldir-reset:hover {
+  color: #fecdd3;
+  background: rgba(244, 114, 182, 0.12);
+  border-color: rgba(244, 114, 182, 0.62);
+}
 .theme-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px;
@@ -3924,11 +4713,41 @@ body.dragging-panel * { cursor: grabbing !important; }
   border: 1px solid var(--glass-border);
   color: var(--text);
   cursor: pointer;
-  font: inherit; font-size: 12px;
-  transition: background 0.15s, border-color 0.15s;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.18s ease, border-color 0.18s ease,
+              transform 0.12s ease, box-shadow 0.22s ease, color 0.18s ease;
 }
-.theme-pill:hover { background: var(--glass-strong); }
-.theme-pill.active { border-color: var(--accent); background: var(--accent-soft); }
+.theme-pill:hover {
+  background: var(--glass-strong);
+  border-color: rgba(255, 255, 255, 0.30);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.theme-pill:active { transform: translateY(0) scale(0.97); }
+.theme-pill.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: white;
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 16px var(--accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.theme-pill.active:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 4px 18px var(--accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
 .theme-pill span {
   width: 14px; height: 14px;
   border-radius: 50%;

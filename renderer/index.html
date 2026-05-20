@@ -5,6 +5,14 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; img-src * data: blob:; media-src * blob:; connect-src *; style-src 'self' 'unsafe-inline'; script-src 'self';">
   <title>Glass</title>
+  <!--
+    Boot script: applies the user's theme + sign-in label BEFORE the
+    stylesheet paints. Inline scripts are blocked by the page's CSP
+    (`script-src 'self'`), so this lives in renderer/boot.js and is
+    loaded as a same-origin file — that satisfies the policy and still
+    runs synchronously during HTML parse, before any paint.
+  -->
+  <script src="boot.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -24,6 +32,11 @@
     <button class="back-btn" id="back-btn" title="Back (Alt+←)" aria-label="Back" disabled>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <button class="back-btn" id="fwd-btn" title="Forward (Alt+→)" aria-label="Forward" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="9 18 15 12 9 6"/>
       </svg>
     </button>
     <div class="search-wrap">

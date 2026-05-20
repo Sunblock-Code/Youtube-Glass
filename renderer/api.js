@@ -197,6 +197,7 @@ export const api = {
   search:   (q)             => tryFetch('/search', { q, filter: 'videos' }),
   streams:  (id)            => tryFetch('/streams/' + id),
   channel:  (id)            => tryFetch('/channel/' + id),
+  channelNext: (id, nextpage) => tryFetch('/nextpage/channel/' + id, { nextpage }),
   comments: (id)            => tryFetch('/comments/' + id),
 
   // ---- Auth ----

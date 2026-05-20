@@ -12,7 +12,6 @@ A glassmorphic YouTube frontend for Windows. Pure custom UI — [Piped](https://
 
 - **Custom UI**: dark glassmorphic shell with frosted cards, animated gradient blobs, custom titlebar.
 - **Ad/tracker blocking**: request-level blocking in the Electron main process via a curated domain + pattern list (uBO-style, not literally uBlock Origin since uBO is a browser extension that can't run in Electron). Edit [adblock.js](adblock.js) to extend.
-- **Proton Pass**: the 🔑 button in the titlebar opens Proton's official extension download page in your default browser. Proton Pass is proprietary and can't be bundled — install the real extension into your real browser.
 - **YouTube Takeout import**: drop the CSV or JSON from [takeout.google.com](https://takeout.google.com) into Glass — works with or without a Piped account.
 - **Google sign-in (real OAuth)**: after a one-time setup of your own Google Cloud OAuth client, Glass auto-pulls your real YouTube subscriptions via the YouTube Data API. Tokens stored locally; refreshes silently. See setup below.
 - **YouTube URL paste**: paste any `youtube.com/watch?v=…`, `youtu.be/…`, or `/shorts/…` link into the search box and it jumps straight to that video.
@@ -54,22 +53,6 @@ Tokens are stored at `%APPDATA%\youtube-glass\google-auth.json`. To disconnect, 
 - **Piped instance** — [renderer/api.js](renderer/api.js). The app refreshes the live list from Piped's index on boot; the seed list at the top is the fallback.
 - **Adblock list** — extend `AD_DOMAINS` / `AD_PATTERNS` in [adblock.js](adblock.js).
 - **Theme** — CSS variables at the top of [renderer/styles.css](renderer/styles.css) drive every color.
-
-## Building installers
-
-Glass uses [`electron-builder`](https://www.electron.build/) to produce a Windows installer (NSIS) and a portable `.exe`.
-
-```bash
-npm install
-npm run dist           # build NSIS installer + portable .exe to dist/
-npm run pack           # quick directory build for testing (no installer)
-```
-
-Output appears in `dist/`:
-- `Glass-<version>-x64.exe` — installer (lets the user pick install path, creates Start Menu + Desktop shortcuts)
-- `Glass-<version>-x64-portable.exe` — single-file portable build, no install required
-
-Releases are also auto-built on GitHub. Push a tag like `v0.1.0` and the [release workflow](.github/workflows/release.yml) builds and attaches the installer + portable to a GitHub Release. The icon is generated from `assets/icon.svg` via the existing `build:icon` script.
 
 ## Caveats
 

@@ -3,24 +3,3 @@ package-lock.json
 .DS_Store
 dist/
 out/
-
-# yt-dlp binary — auto-downloaded by the app on first install. Don't commit.
-yt-dlp.exe
-
-# Editor / IDE
-.vscode/
-.idea/
-
-# Logs
-*.log
-npm-debug.log*
-
-# Local env / secrets
-.env
-.env.local
-
-# Glass user data files (in case anyone runs the app from inside the repo)
-glass-settings.json
-glass-piped-auth.json
-glass-state.json
-google-auth.json

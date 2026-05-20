@@ -21,34 +21,124 @@ const backBtn = document.getElementById('back-btn');
 
 let ytdlpReady = false;
 
-// ---------- Back-navigation history ----------
-const navStack = [];
+// ---------- Back/forward navigation history ----------
+const navStack = [];     // pages behind the current one
+const navForward = [];   // pages ahead (populated by going Back)
 let currentNav = null;
 let navSuppressPush = false;
+const fwdBtn = document.getElementById('fwd-btn');
 
 function pushNav(state) {
   navStack.push(state);
   if (navStack.length > 50) navStack.shift();
 }
+// Kept the name (called from go()) but now also drives the forward button.
 function refreshBackBtn() {
   if (backBtn) backBtn.disabled = navStack.length === 0;
+  if (fwdBtn)  fwdBtn.disabled  = navForward.length === 0;
 }
 async function goBack() {
   if (!navStack.length) return;
+  if (currentNav) navForward.push(currentNav);   // current page becomes "forward"
   const prev = navStack.pop();
-  navSuppressPush = true;
+  navSuppressPush = true;     // go() must not re-push or wipe the forward stack
   await go(prev.route, ...prev.args);
 }
+async function goForward() {
+  if (!navForward.length) return;
+  if (currentNav) pushNav(currentNav);           // current page goes back onto Back
+  const next = navForward.pop();
+  navSuppressPush = true;
+  await go(next.route, ...next.args);
+}
 backBtn.onclick = goBack;
+if (fwdBtn) fwdBtn.onclick = goForward;
 document.addEventListener('mouseup', (e) => {
-  if (e.button === 3) { e.preventDefault(); goBack(); }   // Mouse 4 (browser back)
+  // Mouse button 3 = browser Back, button 4 = browser Forward.
+  if (e.button === 3) { e.preventDefault(); goBack(); }
+  else if (e.button === 4) { e.preventDefault(); goForward(); }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.altKey && e.key === 'ArrowLeft') {
-    e.preventDefault();
-    goBack();
-  }
+  if (e.altKey && e.key === 'ArrowLeft')  { e.preventDefault(); goBack(); }
+  else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
 });
+
+// ---------- Hold "R" to refresh ----------
+// Hold R: a ring fills over ~850ms and the current view reloads the instant
+// it completes a full 360°. Release early → cancels, no refresh. Ignored
+// while typing so it doesn't fight the search box / forms.
+(function setupHoldRefresh() {
+  const HOLD_MS = 850;
+  const R = 26;
+  const CIRC = 2 * Math.PI * R;
+  let ring = null, ringProg = null, raf = null, startT = 0, active = false;
+
+  const isTyping = () => {
+    const el = document.activeElement;
+    if (!el) return false;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return true;
+    return !!el.isContentEditable;
+  };
+  const ensureRing = () => {
+    if (ring) return;
+    ring = document.createElement('div');
+    ring.className = 'refresh-ring';
+    ring.innerHTML =
+      '<svg viewBox="0 0 64 64" aria-hidden="true">' +
+        '<circle class="rr-track" cx="32" cy="32" r="' + R + '"></circle>' +
+        '<circle class="rr-prog" cx="32" cy="32" r="' + R + '"></circle>' +
+      '</svg>' +
+      '<svg class="rr-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>' +
+      '</svg>';
+    document.body.appendChild(ring);
+    ringProg = ring.querySelector('.rr-prog');
+    ringProg.style.strokeDasharray = CIRC.toFixed(2);
+  };
+  const setProgress = (p) => {
+    ringProg.style.strokeDashoffset = (CIRC * (1 - p)).toFixed(2);
+  };
+  const stop = () => {
+    active = false;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    if (ring) ring.classList.remove('show', 'done');
+  };
+  const tick = () => {
+    if (!active) return;
+    const p = Math.min(1, (performance.now() - startT) / HOLD_MS);
+    setProgress(p);
+    if (p >= 1) {
+      active = false;
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      ring.classList.add('done');
+      setTimeout(() => { if (ring) ring.classList.remove('show', 'done'); }, 220);
+      // Reload the current view WITHOUT touching back/forward history.
+      if (currentNav) { navSuppressPush = true; go(currentNav.route, ...currentNav.args); }
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'r' && e.key !== 'R') return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;  // leave Ctrl+R etc. alone
+    if (e.repeat) { e.preventDefault(); return; }
+    if (isTyping() || active) return;
+    e.preventDefault();
+    ensureRing();
+    active = true;
+    startT = performance.now();
+    setProgress(0);
+    ring.classList.add('show');
+    raf = requestAnimationFrame(tick);
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key !== 'r' && e.key !== 'R') return;
+    if (active) stop();                 // released before 360° → cancel
+  });
+  // Lose the key-up if the window is blurred mid-hold — cancel cleanly.
+  window.addEventListener('blur', () => { if (active) stop(); });
+})();
 
 // --- Aero-Snap-style window controls on the titlebar ---
 // Electron's CSS drag regions don't always trigger Windows' native Aero Snap,
@@ -132,8 +222,26 @@ const DEFAULT_SETTINGS = {
   relatedWidth: 380,     // px — width of the Up next sidebar
   commentsPlacement: 'side',  // 'auto' | 'side' | 'below'  (default = always left)
   motion: 'subtle',   // 'still' | 'subtle' | 'lively'
-  bgMode: 'gradient', // 'gradient' | 'solid' — flat colour bg with no blobs
+  bgMode: 'gradient', // 'gradient' | 'solid' | 'acrylic' | 'mica' | 'gaussian' | 'clear'
   bgSolidColor: '#0a0612',
+  bgTint: 78,         // % — (legacy) was acrylic/clear surface tint; unused now.
+  clearSeeThrough: 0, // % — "Background dim" veil over the desktop in
+                      // see-through modes (Clear/Acrylic/Mica/Gaussian).
+                      // 0 = no veil (full desktop), higher = darker veil.
+                      // UI cards are NOT affected by this — see
+                      // acrylicCardAlpha for the surface-see-through slider.
+  acrylicCardAlpha: 0,  // % — see-through modes only: how transparent the
+                        // cards/panels/titlebar are. 0 = solid (current
+                        // default), higher = the OS acrylic / real desktop
+                        // shows through the cards too. This is what makes
+                        // acrylic feel "really see-through" instead of just
+                        // dim around the edges.
+  acrylicBlur: 0,       // px — see-through modes only: additional CSS
+                        // backdrop-filter blur on cards/titlebar. Only
+                        // visible when acrylicCardAlpha > 0 (i.e. when the
+                        // cards are translucent enough to let the backdrop
+                        // show through). 0 = off (blanket no-backdrop-filter
+                        // rule wins, keeping the smooth-composite default).
   seeThrough: 0,      // % — how transparent the UI background is. Higher = more
                       // desktop showthrough (best paired with Mica/Acrylic backdrop)
   cardGlow: true,
@@ -143,6 +251,8 @@ const DEFAULT_SETTINGS = {
   playbarHeight: 4,     // px — height of the play bar at rest
   playbarHeightHover: 12, // px — height while hovering the player
   showHeatmap: true,    // YouTube "Most Replayed" curve over the progress bar
+  homeMode: 'mixed',    // Home feed: 'mixed' | 'trending' | 'foryou' | 'dashboard'
+  subtitlePos: { x: 0.5, y: 0.88 }, // normalized center (fraction of player W/H) of the draggable caption box
   pullout: {
     enabled: false,
     side: 'right',                           // 'left' | 'right'
@@ -206,7 +316,49 @@ function applySettings(s) {
   root.style.setProperty('--blob-2',      t.blob2);
   root.style.setProperty('--blob-3',      t.blob3);
   root.dataset.motion = s.motion || 'subtle';
-  root.dataset.bgmode = s.bgMode === 'solid' ? 'solid' : 'gradient';
+  // bgMode: 'gradient' (default colourful blobs), 'solid' (flat colour),
+  // 'acrylic' (Win11 OS frosted backdrop — blurred desktop shows in empty
+  // areas), or 'clear' (genuinely transparent window — SHARP desktop behind
+  // the UI; requires the window to have been created transparent, hence the
+  // restart prompt when toggling it).
+  // Mica & Gaussian are extra Win11 OS materials that look/behave exactly
+  // like Acrylic (transparent window + OS material + opaque UI + the
+  // Background-dim veil). They REUSE Acrylic's CSS by mapping the styling
+  // attribute to 'acrylic' — the real mode is still in s.bgMode for the
+  // material call & pill highlight. Zero CSS duplication, so Acrylic's
+  // working rules are untouched.
+  const cssBgMode = (s.bgMode === 'mica' || s.bgMode === 'gaussian') ? 'acrylic' : s.bgMode;
+  root.dataset.bgmode = ['solid', 'acrylic', 'clear'].includes(cssBgMode) ? cssBgMode : 'gradient';
+  // Clear-glass "Background dim": opacity of the dark veil over the desktop
+  // in the empty space ONLY. 0 = no veil (pure sharp desktop), higher =
+  // desktop progressively darkened. The UI surfaces stay fully opaque and
+  // are NEVER touched by this. CSS reads --clear-bg-tint (bgMode=clear).
+  {
+    const st = (typeof s.clearSeeThrough === 'number') ? s.clearSeeThrough : 0;
+    const veil = Math.min(0.85, Math.max(0, st / 100));
+    root.style.setProperty('--clear-bg-tint', veil.toFixed(3));
+  }
+  // See-through-modes "Surface see-through": alpha of the cards/titlebar.
+  // 0% = fully solid (default, the original behavior); higher = the OS
+  // acrylic / real desktop shows progressively through the cards too.
+  // Capped at 75% so text never becomes unreadable.
+  {
+    const sa = (typeof s.acrylicCardAlpha === 'number') ? s.acrylicCardAlpha : 0;
+    const seeThrough = Math.min(0.75, Math.max(0, sa / 100));
+    // Card alpha is the INVERSE of see-through: 0% see-through = alpha 1.
+    root.style.setProperty('--acrylic-card-alpha', (1 - seeThrough).toFixed(3));
+  }
+  // See-through-modes "Blur": optional backdrop-filter blur on cards.
+  // The blanket `* { backdrop-filter: none !important }` rule in the
+  // acrylic/clear CSS keeps the smooth-composite default in place. We
+  // toggle a root attribute that activates the scoped, opted-in
+  // backdrop-filter rule only when the slider is above 0.
+  {
+    const blur = (typeof s.acrylicBlur === 'number') ? s.acrylicBlur : 0;
+    const px = Math.min(40, Math.max(0, blur));
+    root.style.setProperty('--acrylic-blur', px + 'px');
+    root.dataset.acrylicBlur = px > 0 ? 'on' : 'off';
+  }
   // Solid bg now reuses the active theme's deep background colour — no
   // separate solid-colour picker. Pick a different theme to change it.
   root.style.setProperty('--bg-solid', t.bg || '#0a0612');
@@ -228,21 +380,31 @@ function applySettings(s) {
   else       root.style.removeProperty('--pb-color');
   root.style.setProperty('--pb-h',       (s.playbarHeight       ?? 4)  + 'px');
   root.style.setProperty('--pb-h-hover', (s.playbarHeightHover  ?? 12) + 'px');
-  // 'frosted' is a renderer-only material; the OS backdrop should fall back to
-  // 'acrylic' so desktop showthrough still works on Win11.
-  const osMaterial = s.material === 'frosted' ? 'acrylic' : (s.material || 'none');
+  // SINGLE source of truth = bgMode. The old separate "material" axis kept
+  // making the window see-through behind the user's back (e.g. Solid mode
+  // with a stale material='acrylic'), bleeding the desktop through the
+  // translucent glass cards — which read as "background opacity affecting
+  // the UI". Only Acrylic uses the OS material now; everything else keeps
+  // the window opaque (Gradient/Solid) or transparent (Clear, no material).
+  // Real OS material per mode: Acrylic→acrylic, Mica→mica, Gaussian→the
+  // Win11 'tabbed' material, Clear→none (sharp), everything else→none.
+  const osMaterial =
+    s.bgMode === 'acrylic'  ? 'acrylic' :
+    s.bgMode === 'mica'     ? 'mica'    :
+    s.bgMode === 'gaussian' ? 'tabbed'  : 'none';
   if (window.app?.setWindowMaterial) window.app.setWindowMaterial(osMaterial);
   root.style.setProperty('--blur',        s.blur + 'px');
   root.style.setProperty('--glass-alpha', (s.glassAlpha / 100).toFixed(3));
   root.style.setProperty('--glass-strong-alpha', Math.min(0.30, (s.glassAlpha / 100) + 0.04).toFixed(3));
-  // See-through: 0% = opaque (--bg-opacity 1), 100% = fully transparent (0).
-  // Falls back to legacy bgOpacity setting if the new one isn't set.
-  const seeThrough = (typeof s.seeThrough === 'number')
-    ? s.seeThrough
-    : (typeof s.bgOpacity === 'number' ? 100 - s.bgOpacity : 0);
-  root.style.setProperty('--bg-opacity',  (1 - seeThrough / 100).toFixed(3));
-  root.style.setProperty('--seethrough', (seeThrough / 100).toFixed(3));
-  if (window.app?.setWindowOpacity) window.app.setWindowOpacity(s.windowOpacity / 100);
+  // Background opacity → ONLY the .bg layer (the app background). 100% =
+  // fully visible background, 0% = background hidden. Nothing else (cards,
+  // text, video, titlebar) is touched.
+  const bgOpacity = (typeof s.bgOpacity === 'number') ? s.bgOpacity : 100;
+  root.style.setProperty('--bg-opacity', (bgOpacity / 100).toFixed(3));
+  // The whole-window opacity dimming is intentionally NOT applied anymore —
+  // it made everything (incl. text) translucent. Force the window fully
+  // opaque so a stale setting can't keep dimming the app.
+  if (window.app?.setWindowOpacity) window.app.setWindowOpacity(1);
   if (window.app?.configurePullout) {
     window.app.configurePullout(s.pullout || DEFAULT_SETTINGS.pullout).then(r => {
       if (r && !r.ok) console.warn('Pull-out:', r.error);
@@ -447,6 +609,9 @@ async function go(route, ...args) {
   // Track history (skip when this call is itself a goBack pop)
   if (!navSuppressPush && currentNav && (currentNav.route !== route || JSON.stringify(currentNav.args) !== JSON.stringify(args))) {
     pushNav(currentNav);
+    // A fresh navigation starts a new branch — anything that was "forward"
+    // (only reachable by pressing Back) is no longer reachable.
+    navForward.length = 0;
   }
   navSuppressPush = false;
   currentNav = { route, args };
@@ -487,14 +652,26 @@ async function go(route, ...args) {
 function showError(e, route, args) {
   const raw = e.message || String(e);
   const isBotBlock = /SignInConfirmNotBot|LOGIN_REQUIRED|not a bot|blocked anonymous/i.test(raw);
-  const isInstanceFault = /^HTTP 5\d\d/.test(raw)
+  // YouTube-side content restrictions: retrying or switching instances won't
+  // help. The video simply isn't playable through Piped/yt-dlp because YouTube
+  // gates it (members-only, private, age-gated, geo-blocked, premium music).
+  const restriction = classifyRestriction(raw);
+  // Only treat as instance fault if it ISN'T a content restriction — restriction
+  // errors sometimes carry the org.schabi prefix and would otherwise be
+  // miscategorized as a transient instance problem.
+  const isInstanceFault = !restriction && (
+    /^HTTP 5\d\d/.test(raw)
     || /failed/i.test(raw) || /aborted/i.test(raw)
-    || /org\.schabi|java\.|StreamHandlers|NewPipe/i.test(raw);
+    || /org\.schabi|java\.|StreamHandlers|NewPipe/i.test(raw)
+  );
   const host = new URL(getInstance()).host;
 
   // Friendly headline + collapsed raw stack/error.
   let headline, body;
-  if (isBotBlock) {
+  if (restriction) {
+    headline = restriction.headline;
+    body = restriction.body;
+  } else if (isBotBlock) {
     headline = 'YouTube is bot-blocking this Piped instance.';
     if (!ytdlpReady) {
       body = `<strong>Install yt-dlp at the top of the page to fix this for good.</strong> yt-dlp runs locally on your machine, so YouTube can't bot-block it like it can with Piped's datacenter IPs. ~17 MB, one-time download into the youtube-glass folder. The Install banner should be visible at the top of Glass — if it isn't, you may already have yt-dlp but it's failing on this video.`;
@@ -509,53 +686,354 @@ function showError(e, route, args) {
     body = '';
   }
 
+  // On a content restriction, Retry is useless — offer "Open on YouTube" and
+  // "Go back" instead.
+  const videoId = route === 'video' ? args[0] : null;
+  const showYouTubeBtn = !!(restriction && videoId);
+
   view.innerHTML = `
     <div class="error">
       <div style="font-size:15px;font-weight:600;margin-bottom:8px">${escape(headline)}</div>
       ${body ? `<div style="font-size:13px;opacity:0.9;margin-bottom:14px;line-height:1.5">${body}</div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:${isInstanceFault ? '14px' : '0'}">
-        <button id="err-retry" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Retry</button>
-        ${isInstanceFault ? `<button id="err-switch" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Try another instance</button>` : ''}
+        ${restriction
+          ? `<button id="err-back" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Go back</button>
+             ${showYouTubeBtn ? `<button id="err-yt" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Open on YouTube</button>` : ''}`
+          : `<button id="err-retry" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Retry</button>
+             ${isInstanceFault ? `<button id="err-switch" class="sub-btn" style="background:var(--glass);color:var(--text);border:1px solid var(--glass-border)">Try another instance</button>` : ''}`}
       </div>
       ${isInstanceFault ? `<details style="font-size:11px;opacity:0.6;cursor:pointer"><summary>Raw error</summary><pre style="white-space:pre-wrap;margin-top:8px;font-family:monospace">${escape(raw)}</pre></details>` : ''}
     </div>
   `;
-  view.querySelector('#err-retry').onclick = () => go(route, ...args);
+  const retry = view.querySelector('#err-retry');
+  if (retry) retry.onclick = () => go(route, ...args);
   const sw = view.querySelector('#err-switch');
   if (sw) sw.onclick = () => { const n = nextInstance(); console.log('Switched to', n); go(route, ...args); };
+  const back = view.querySelector('#err-back');
+  if (back) back.onclick = () => (navStack.length ? goBack() : go('home'));
+  const yt = view.querySelector('#err-yt');
+  if (yt) yt.onclick = () => window.app?.openExternal?.(`https://www.youtube.com/watch?v=${videoId}`)
+    || window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+}
+
+// Map a raw Piped/yt-dlp error message to a user-friendly explanation of the
+// YouTube-side content gate. Returns null if the error doesn't look like a
+// content restriction (caller falls back to generic handling).
+function classifyRestriction(raw) {
+  const r = String(raw || '');
+  if (/PaidContentException|only available for members|members.only/i.test(r)) {
+    return {
+      headline: 'This video is members-only.',
+      body: 'The channel owner gates this video behind a paid membership on YouTube. There\'s no way to play it through Glass — you\'d need to be a paying member and watch it on youtube.com.',
+    };
+  }
+  if (/PrivateContentException|This video is private|private video/i.test(r)) {
+    return {
+      headline: 'This video is private.',
+      body: 'The uploader has set this video to private. Only people they\'ve directly invited can watch it.',
+    };
+  }
+  if (/AgeRestrictedContentException|age.restricted|age.gated|sign in to confirm your age/i.test(r)) {
+    return {
+      headline: 'This video is age-restricted.',
+      body: 'YouTube requires a signed-in, age-verified account to watch this. Glass plays anonymously, so it can\'t bypass the gate.',
+    };
+  }
+  if (/GeographicRestrictionException|not available in your country|geo.restricted|geo.blocked/i.test(r)) {
+    return {
+      headline: 'This video is blocked in your region.',
+      body: 'The uploader (or YouTube) has restricted this video from being played in your country.',
+    };
+  }
+  if (/YoutubeMusicPremiumContentException|Premium.*content|premium.only/i.test(r)) {
+    return {
+      headline: 'This is YouTube Premium content.',
+      body: 'This video is exclusive to YouTube Premium subscribers and can\'t be played through Glass.',
+    };
+  }
+  if (/ContentNotAvailableException|video.*(unavailable|removed|deleted|terminated)|This video isn't available/i.test(r)) {
+    return {
+      headline: 'This video is unavailable.',
+      body: 'It may have been removed by the uploader, taken down by YouTube, or the channel may have been terminated.',
+    };
+  }
+  if (/live stream.*(ended|offline)|livestream.*(ended|not started)/i.test(r)) {
+    return {
+      headline: 'This live stream isn\'t playable right now.',
+      body: 'The stream has ended, hasn\'t started yet, or its archive is unavailable.',
+    };
+  }
+  return null;
 }
 
 // ---------- Views ----------
 let dashboardEditing = false;
 
+// Home dispatcher. Home is no longer just the channel-row dashboard — the
+// user picks a feed via the mode bar; the choice persists in settings.
 async function renderDashboard() {
+  const mode = currentSettings.homeMode || 'mixed';
+  try {
+    if (mode === 'trending') return await renderHomeTrending();
+    if (mode === 'foryou')   return await renderHomeForYou();
+    if (mode === 'dashboard') return await renderHomeDashboard();
+    return await renderHomeMixed();
+  } catch (e) {
+    console.error('[home] render failed', e);
+    view.innerHTML = homeModeBar(mode) +
+      `<div class="empty">Couldn't load this feed. Pick another above, or retry.</div>`;
+    wireHomeModeBar();
+  }
+}
+
+// The segmented switcher shown at the top of every Home mode.
+const HOME_MODES = [
+  { key: 'mixed',     label: 'Mixed' },
+  { key: 'trending',  label: 'Trending' },
+  { key: 'foryou',    label: 'For You' },
+  { key: 'dashboard', label: 'Dashboard' },
+];
+// Tracks the mode that was active right before the user clicked a new tab.
+// Consumed by the next wireHomeModeBar() to seed the indicator at the OLD
+// position and animate to the NEW one. Cleared after use so navigations
+// back to home from elsewhere don't trigger a phantom slide.
+let _prevHomeMode = null;
+function homeModeBar(active) {
+  return `<div class="home-modebar" role="tablist">
+    <div class="home-mode-indicator" aria-hidden="true"></div>
+    ${HOME_MODES.map(m =>
+      `<button class="home-modebtn${m.key === active ? ' active' : ''}" role="tab" data-home-mode="${m.key}">${m.label}</button>`
+    ).join('')}
+  </div>`;
+}
+function wireHomeModeBar() {
+  const bar = view.querySelector('.home-modebar');
+  if (!bar) return;
+  const indicator = bar.querySelector('.home-mode-indicator');
+  const activeBtn = bar.querySelector('.home-modebtn.active');
+  if (!indicator || !activeBtn) return;
+
+  // Move the indicator under a given button. We use offsetLeft/offsetTop —
+  // those are in the bar's coordinate space (relative to its border-box).
+  // The indicator is absolutely positioned with `top:0; left:0`, which
+  // references the PADDING box (inside the border), so we subtract the
+  // bar's border width (clientLeft/clientTop) to land exactly on the
+  // button's outer corner. Same trick for width/height: offsetWidth/Height
+  // include the button's own border, and our indicator is box-sizing:
+  // border-box, so its 1px border fits cleanly inside without inflating.
+  const positionAt = (btn) => {
+    const x = btn.offsetLeft - bar.clientLeft;
+    const y = btn.offsetTop  - bar.clientTop;
+    indicator.style.transform = `translate(${x}px, ${y}px)`;
+    indicator.style.width  = btn.offsetWidth  + 'px';
+    indicator.style.height = btn.offsetHeight + 'px';
+  };
+
+  // First paint after a click: snap to the OLD position with transitions
+  // off, then on the next frame turn transitions back on and move to the
+  // NEW position so the indicator visibly slides over. On any other mount
+  // (initial load, nav back to home) we just snap silently.
+  const fromBtn = _prevHomeMode
+    ? bar.querySelector(`[data-home-mode="${_prevHomeMode}"]`)
+    : null;
+  if (fromBtn && fromBtn !== activeBtn) {
+    indicator.style.transition = 'none';
+    positionAt(fromBtn);
+    // Force layout so the "no transition" assignment lands before we
+    // re-enable transitions on the next frame.
+    void indicator.offsetWidth;
+    requestAnimationFrame(() => {
+      indicator.style.transition = '';
+      positionAt(activeBtn);
+    });
+  } else {
+    indicator.style.transition = 'none';
+    requestAnimationFrame(() => {
+      positionAt(activeBtn);
+      requestAnimationFrame(() => { indicator.style.transition = ''; });
+    });
+  }
+  _prevHomeMode = null;
+
+  view.querySelectorAll('[data-home-mode]').forEach(btn => {
+    btn.onclick = () => {
+      const next = btn.dataset.homeMode;
+      if (next === (currentSettings.homeMode || 'mixed')) return;
+      _prevHomeMode = currentSettings.homeMode || 'mixed';
+      currentSettings.homeMode = next;
+      saveSettings(currentSettings);
+      renderDashboard();
+    };
+  });
+}
+
+// Best-effort region for /trending from the UI locale (e.g. en-US → US).
+function regionGuess() {
+  try {
+    const loc = navigator.language || 'en-US';
+    const m = loc.match(/[-_]([A-Za-z]{2})\b/);
+    return m ? m[1].toUpperCase() : 'US';
+  } catch { return 'US'; }
+}
+
+// Recent uploads from the user's subscriptions. Logged-in Piped accounts get
+// the fast server-side feed; otherwise we aggregate local-sub channels (and
+// fall back to the featured dashboard channels) with a hard cap so Home
+// doesn't fire hundreds of channel requests.
+async function fetchSubItems() {
+  if (isLoggedIn()) {
+    try {
+      const feed = await api.feed();
+      if (Array.isArray(feed) && feed.length) return feed;
+    } catch {}
+  }
+  let channels = getLocalSubs();
+  if (!channels.length) {
+    channels = getDashboard().map(d => ({ id: d.id, name: d.name }));
+  }
+  channels = channels.filter(c => c && c.id).slice(0, 25);
+  if (!channels.length) return [];
+  const out = [];
+  await Promise.all(channels.map(async c => {
+    try {
+      const ch = await api.channel(c.id);
+      for (const r of (ch.relatedStreams || []).slice(0, 5)) out.push(r);
+    } catch {}
+  }));
+  out.sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0));
+  return out;
+}
+
+// Round-robin two lists into one, de-duped by video id, newest-ish first.
+function interleaveDedupe(primary, secondary, cap = 48) {
+  const seen = new Set();
+  const out = [];
+  const push = (it) => {
+    if (!it || !it.url) return;
+    const vid = videoIdFromUrl(it.url);
+    if (!vid || seen.has(vid)) return;
+    seen.add(vid);
+    out.push(it);
+  };
+  const a = primary || [], b = secondary || [];
+  for (let i = 0; i < Math.max(a.length, b.length) && out.length < cap; i++) {
+    if (i < a.length) push(a[i]);
+    if (i < b.length) push(b[i]);
+  }
+  return out.slice(0, cap);
+}
+
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// --- Home: Trending ---
+async function renderHomeTrending() {
+  view.innerHTML = homeModeBar('trending') + `<div class="loader">Loading trending</div>`;
+  wireHomeModeBar();
+  let items = [];
+  try { items = await api.trending(regionGuess()); } catch {}
+  items = (items || []).filter(i => i && i.url);
+  view.innerHTML = homeModeBar('trending') + (items.length
+    ? `<h2 class="section-title">Trending</h2><div class="grid">${items.map(videoCard).join('')}</div>`
+    : `<div class="empty">Couldn't load trending right now — Piped instances vary. Try again, or switch to Dashboard.</div>`);
+  attachCardClicks();
+  wireHomeModeBar();
+}
+
+// --- Home: Mixed (subscriptions + trending interleaved) ---
+async function renderHomeMixed() {
+  view.innerHTML = homeModeBar('mixed') + `<div class="loader">Loading your mix</div>`;
+  wireHomeModeBar();
+  const [subItems, trend] = await Promise.all([
+    fetchSubItems().catch(() => []),
+    api.trending(regionGuess()).catch(() => []),
+  ]);
+  // Subs lead (it's "your" feed) but trending is woven through for discovery.
+  const merged = interleaveDedupe(subItems, (trend || []).filter(i => i && i.url));
+  view.innerHTML = homeModeBar('mixed') + (merged.length
+    ? `<h2 class="section-title">Your mix</h2><div class="grid">${merged.map(videoCard).join('')}</div>`
+    : `<div class="empty">Nothing to mix yet. Subscribe to channels or sign in, or switch to Trending above.</div>`);
+  attachCardClicks();
+  wireHomeModeBar();
+}
+
+// --- Home: For You (homegrown algo from watch history + subs) ---
+async function renderHomeForYou() {
+  view.innerHTML = homeModeBar('foryou') + `<div class="loader">Building suggestions</div>`;
+  wireHomeModeBar();
+  const hist = getHistory();
+  const watched = new Set(hist.map(h => h.id).filter(Boolean));
+  const seedIds = [...watched].slice(0, 6);
+
+  let related = [];
+  if (seedIds.length) {
+    const lists = await Promise.all(seedIds.map(id => fetchSidebarRelated(id).catch(() => [])));
+    related = lists.flat();
+  }
+  const seen = new Set();
+  const pool = [];
+  for (const it of related) {
+    if (!it || !it.url) continue;
+    const vid = videoIdFromUrl(it.url);
+    if (!vid || watched.has(vid) || seen.has(vid)) continue;
+    seen.add(vid);
+    pool.push(it);
+  }
+  shuffleInPlace(pool);
+  // Sparse history → top up with subs so the page is never near-empty.
+  if (pool.length < 12) {
+    const filler = await fetchSubItems().catch(() => []);
+    for (const it of filler) {
+      if (!it || !it.url) continue;
+      const vid = videoIdFromUrl(it.url);
+      if (!vid || watched.has(vid) || seen.has(vid)) continue;
+      seen.add(vid);
+      pool.push(it);
+    }
+  }
+  const final = pool.slice(0, 48);
+  view.innerHTML = homeModeBar('foryou') + (final.length
+    ? `<h2 class="section-title">For you</h2><div class="grid">${final.map(videoCard).join('')}</div>`
+    : `<div class="empty">Watch a few videos and this fills with suggestions based on them.</div>`);
+  attachCardClicks();
+  wireHomeModeBar();
+}
+
+async function renderHomeDashboard() {
   const dashboard = getDashboard();
 
   if (!dashboard.length) {
     const all = await getAvailableChannels();
     if (!all.length) {
-      view.innerHTML = `
+      view.innerHTML = homeModeBar('dashboard') + `
         <div class="dash-empty">
           <div class="title">Build your dashboard</div>
           <div class="sub">Sign in or import your YouTube subscriptions to start.<br>Then come back here and pick channels to feature on your home screen.</div>
           <button id="dash-go-signin">Get subscriptions</button>
         </div>
       `;
+      wireHomeModeBar();
       view.querySelector('#dash-go-signin').onclick = showAuthMenu;
       return;
     }
-    view.innerHTML = `
+    view.innerHTML = homeModeBar('dashboard') + `
       <div class="dash-empty">
         <div class="title">Build your dashboard</div>
         <div class="sub">Pick which of your ${all.length} subscribed channel${all.length === 1 ? '' : 's'} appear on your home screen, in your own order.</div>
         <button id="dash-build">+ Add channels</button>
       </div>
     `;
+    wireHomeModeBar();
     view.querySelector('#dash-build').onclick = showChannelPicker;
     return;
   }
 
-  view.innerHTML = `
+  view.innerHTML = homeModeBar('dashboard') + `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
       <h2 class="section-title" style="margin:0;flex:1">Your dashboard</h2>
       <button id="dash-edit" class="topnav-style-btn ${dashboardEditing ? 'primary' : ''}">${dashboardEditing ? 'Done' : 'Edit dashboard'}</button>
@@ -574,6 +1052,7 @@ async function renderDashboard() {
       </div>
     ` : ''}
   `;
+  wireHomeModeBar();
   renderDashboardWidgets(view.querySelector('#dash-widgets'));
   if (dashboardEditing) {
     renderWidgetToggles(view.querySelector('#dash-widget-toggles'));
@@ -1209,15 +1688,22 @@ function buildHeatmapSVG(heatmap) {
   // Close to baseline so we can fill the area under the curve
   const fillD = d + ` L ${W},${H} L 0,${H} Z`;
 
+  // Stroke + fill use `currentColor` so the curve picks up the theme accent
+  // (or the user's chosen playbar colour) via CSS, instead of being hard-coded
+  // white. The fill uses a multi-stop gradient that fades to transparent at
+  // the bottom so the curve sits cleanly above the progress strip; a soft
+  // top-edge highlight gives the crest a subtle "lit" feel.
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
     <defs>
       <linearGradient id="heatGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%"  stop-color="rgba(255,255,255,0.55)"/>
-        <stop offset="100%" stop-color="rgba(255,255,255,0.03)"/>
+        <stop offset="0%"   stop-color="currentColor" stop-opacity="0.55"/>
+        <stop offset="55%"  stop-color="currentColor" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
       </linearGradient>
     </defs>
     <path d="${fillD}" fill="url(#heatGrad)"/>
-    <path d="${d}" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+    <path d="${d}" fill="none" stroke="currentColor" stroke-opacity="0.95" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <path d="${d}" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 
@@ -1400,7 +1886,7 @@ function shortsCard(item) {
       </div>
       <div class="shorts-meta">
         <div class="title">${escape(item.title || '')}</div>
-        <div class="sub">${escape(item.uploaderName || '')}${item.views != null ? ' · ' + fmtViews(item.views) : ''}</div>
+        <div class="sub"><span class="ch">${escape(item.uploaderName || '')}</span>${item.views != null ? '<span class="dot">·</span>' + fmtViews(item.views) : ''}</div>
       </div>
     </div>
   `;
@@ -1426,11 +1912,15 @@ async function renderVideo(id) {
   const RELATED_MODES = ['list', 'overlay', 'thumbs'];
   let relatedMode = localStorage.getItem('related-mode') || 'list';
   if (!RELATED_MODES.includes(relatedMode)) relatedMode = 'list';
+  // Sidebar can show one of three sources, persisted across pages.
+  const RELATED_SOURCES = ['related', 'subs', 'history'];
+  let relatedSource = localStorage.getItem('related-source') || 'related';
+  if (!RELATED_SOURCES.includes(relatedSource)) relatedSource = 'related';
   const statsParts = [];
-  if (data.views != null) statsParts.push(fmtViews(data.views));
-  if (currentSettings.showLikes && data.likes != null) statsParts.push(`${fmtNumber(data.likes)} likes`);
-  if (data.uploadDate) statsParts.push(fmtRelative(Date.parse(data.uploadDate)));
-  const statsLine = statsParts.join(' · ');
+  if (data.views != null) statsParts.push(`<span class="stat"><b>${escape(fmtNumber(data.views))}</b> views</span>`);
+  if (currentSettings.showLikes && data.likes != null) statsParts.push(`<span class="stat"><b>${escape(fmtNumber(data.likes))}</b> likes</span>`);
+  if (data.uploadDate) statsParts.push(`<span class="stat stat-time">${escape(fmtRelative(Date.parse(data.uploadDate)))}</span>`);
+  const statsLine = statsParts.join('<span class="stat-sep" aria-hidden="true">·</span>');
 
   const descMode = localStorage.getItem('desc-mode') || 'raw';
 
@@ -1447,30 +1937,32 @@ async function renderVideo(id) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
-        <div class="comments-header">
-          <h2 class="section-title">Comments</h2>
-          <button class="related-toggle" id="comments-merge" title="Merge with Up next" aria-label="Merge">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="15" y="6" width="6" height="12" rx="1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-          </button>
-          <button class="related-toggle" id="comments-toggle" title="${commentsCollapsed ? 'Show comments' : 'Hide comments'}" aria-label="Toggle comments">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-        </div>
-        <div class="comment-composer" id="comment-composer">
-          <textarea id="cc-input" rows="1" placeholder="Add a comment…"></textarea>
-          <div class="comment-composer-actions">
-            <span class="comment-composer-hint">Posting requires YouTube — we'll copy your comment & open the video.</span>
-            <button id="cc-cancel" type="button">Cancel</button>
-            <button id="cc-post" type="button" class="primary">Comment</button>
+        <div class="comments-stickyhead">
+          <div class="comments-header">
+            <h2 class="section-title">Comments</h2>
+            <button class="related-toggle" id="comments-merge" title="Merge with Up next" aria-label="Merge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="15" y="6" width="6" height="12" rx="1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+            </button>
+            <button class="related-toggle" id="comments-toggle" title="${commentsCollapsed ? 'Show comments' : 'Hide comments'}" aria-label="Toggle comments">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
           </div>
-        </div>
-        <div class="comment-filters">
-          <button class="comment-filter active" data-sort="top">Top</button>
-          <button class="comment-filter" data-sort="new">New</button>
+          <div class="comment-composer" id="comment-composer">
+            <textarea id="cc-input" rows="1" placeholder="Add a comment…"></textarea>
+            <div class="comment-composer-actions">
+              <span class="comment-composer-hint">Posting requires YouTube — we'll copy your comment & open the video.</span>
+              <button id="cc-cancel" type="button">Cancel</button>
+              <button id="cc-post" type="button" class="primary">Comment</button>
+            </div>
+          </div>
+          <div class="comment-filters">
+            <button class="comment-filter active" data-sort="top">Top</button>
+            <button class="comment-filter" data-sort="new">New</button>
           <button class="comment-filter" data-sort="replies">Most replies</button>
           <button class="comment-filter" data-sort="pinned">Pinned</button>
+          </div>
         </div>
         <div class="comments-list" id="comments-list">
           <div class="loader" style="padding:30px">Loading comments</div>
@@ -1479,9 +1971,13 @@ async function renderVideo(id) {
       <div class="player-col">
         <div class="player-wrap" id="player-wrap">
           <video autoplay playsinline></video>
+          <div class="cc-subs" id="cc-subs" aria-hidden="true"></div>
           <div class="player-bottom-fade"></div>
           <div class="player-heatmap" id="player-heatmap"></div>
-          <div class="player-progress-strip"><div class="progress-fill" id="pb-fill"></div></div>
+          <div class="player-progress-strip">
+            <div class="progress-buffered" id="pb-buffered"></div>
+            <div class="progress-fill" id="pb-fill"></div>
+          </div>
           <div class="vol-side" id="vol-side">
             <div class="vol-track" id="vol-track"><div class="vol-fill" id="vol-fill"></div></div>
           </div>
@@ -1564,12 +2060,15 @@ async function renderVideo(id) {
                 </div>
               </div>
             </div>
+
+            <div class="cc-opt-section-label" style="margin-top:14px">Caption placement</div>
+            <div class="cc-opt-hint">Drag the caption text anywhere on the video to reposition it. The spot is remembered for every video.</div>
           </div>
         </div>
         <div class="video-meta">
           <div class="title-row">
             <h1>${escape(data.title || '')}</h1>
-            <div class="stats">${escape(statsLine)}</div>
+            <div class="stats">${statsLine}</div>
           </div>
           <div class="channel-row">
             <button class="channel-link" id="channel-link" ${channelId ? '' : 'disabled'} title="${escape(data.uploader || '')}">
@@ -1581,7 +2080,7 @@ async function renderVideo(id) {
               <span>Download</span>
             </button>
             <button id="sub-btn" class="sub-btn ${subbed ? 'subbed' : ''}">
-              ${subbed ? 'Subscribed' : 'Subscribe'}
+              <span>${subbed ? 'Subscribed' : 'Subscribe'}</span>
             </button>
           </div>
           <div class="video-desc-wrap">
@@ -1604,22 +2103,29 @@ async function renderVideo(id) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
+        <div class="related-tabs" role="tablist" aria-label="Sidebar source">
+          <button class="related-tab ${relatedSource === 'related' ? 'active' : ''}" data-rt="related" role="tab">Up next</button>
+          <button class="related-tab ${relatedSource === 'subs' ? 'active' : ''}" data-rt="subs" role="tab">Subs</button>
+          <button class="related-tab ${relatedSource === 'history' ? 'active' : ''}" data-rt="history" role="tab">History</button>
+        </div>
         <div class="related-header">
-          <h2 class="section-title">Up next</h2>
+          <h2 class="section-title" id="related-active-label">${relatedSource === 'subs' ? 'Subs' : (relatedSource === 'history' ? 'History' : 'Up next')}</h2>
           <button id="related-merge" title="Merge with Comments (drag or click)" aria-label="Merge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="15" y="6" width="6" height="12" rx="1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
           </button>
           <button class="related-toggle" id="related-layout" title="Layout: ${relatedMode}" aria-label="Cycle layout">
             ${relatedLayoutIcon(relatedMode)}
           </button>
-          <button class="related-toggle" id="related-toggle" title="${relatedCollapsed ? 'Show up next' : 'Hide up next'}" aria-label="Toggle Up next panel">
+          <button class="related-toggle" id="related-toggle" title="${relatedCollapsed ? 'Show sidebar' : 'Hide sidebar'}" aria-label="Toggle sidebar panel">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
           </button>
         </div>
-        <div class="related" data-mode="${relatedMode}">
-          ${(data.relatedStreams || []).slice(0, 16).map(relatedRow).join('')}
+        <div class="related" data-mode="${relatedMode}" data-src="${relatedSource}">
+          ${relatedSource === 'related'
+            ? (data.relatedStreams || []).slice(0, 16).map(relatedRow).join('')
+            : '<div class="loader" style="padding:30px">Loading</div>'}
         </div>
       </div>
     </div>
@@ -1703,11 +2209,19 @@ async function renderVideo(id) {
   const saved = getResume(id);
   const eligible = askResume && saved && saved.position > 10
     && (!saved.duration || saved.position / saved.duration < 0.95);
-  if (eligible) showResumeBanner(saved.position, () => {
-    const apply = () => { try { v.currentTime = saved.position; } catch (e) { console.warn('seek failed', e); } };
-    if (v.readyState >= 1) apply();
-    else v.addEventListener('loadedmetadata', apply, { once: true });
-  });
+  if (eligible) {
+    const showWhenReady = () => showResumeBanner(saved.position, () => {
+      const apply = () => { try { v.currentTime = saved.position; } catch (e) { console.warn('seek failed', e); } };
+      if (v.readyState >= 1) apply();
+      else v.addEventListener('loadedmetadata', apply, { once: true });
+    });
+    // Don't flash the banner over the still-black loading frame — that read
+    // as "a weird rectangle sliding down behind the video while it loads".
+    // Wait until the video can actually play; show immediately if it already
+    // can. If `canplay` never arrives we simply skip the prompt.
+    if (v.readyState >= 3) showWhenReady();
+    else v.addEventListener('canplay', showWhenReady, { once: true });
+  }
 
   // Save extra times for safety: on pause, on seek-finished
   v.addEventListener('pause', () => {
@@ -1757,22 +2271,30 @@ async function renderVideo(id) {
     }
 
     // The thumbnail <video> seeks to the hover position. Always use the
-    // SMALLEST muxed stream available (typically 360p) — even if the main
+    // SMALLEST mp4 stream available (typically 144p–360p) — even if the main
     // player is on 1080p. That way the thumb loads/seeks fast, and we
-    // don't fight to seek through a giant video-only stream.
+    // don't fight to seek through a giant high-res stream.
     //
-    // Fallback chain:
-    //   1. Lowest-res muxed mp4 from data.videoStreams (best for scrubbing)
-    //   2. Main video's currentSrc if it's a direct URL (not blob/m3u8)
-    //   3. Static poster image (data.thumbnailUrl) shown via the <img> layer
+    // Fallback chain (in order of preference):
+    //   1. Lowest-res muxed mp4 (has audio + video — but audio is muted anyway)
+    //   2. Lowest-res video-only mp4 (no audio, but still a real frame source —
+    //      this is the common case on modern YouTube where muxed streams are
+    //      rare/absent and almost everything is split into video-only tracks)
+    //   3. Main video's currentSrc if it's a direct URL (not blob/m3u8)
+    //   4. Static poster image (data.thumbnailUrl) shown via the <img> layer
     let thumbReady = false;
-    const lowResMuxed = (data.videoStreams || [])
-      .filter(s => !s.videoOnly && s.url && (s.mimeType || '').includes('mp4'))
+    const allMp4 = (data.videoStreams || [])
+      .filter(s => s.url && (s.mimeType || '').includes('mp4'));
+    const lowResMuxed = allMp4
+      .filter(s => !s.videoOnly)
+      .sort((a, b) => (parseInt(a.quality) || 0) - (parseInt(b.quality) || 0))[0];
+    const lowResVideoOnly = allMp4
+      .filter(s => s.videoOnly)
       .sort((a, b) => (parseInt(a.quality) || 0) - (parseInt(b.quality) || 0))[0];
 
     const initThumb = () => {
       try {
-        let thumbSrc = lowResMuxed?.url || '';
+        let thumbSrc = lowResMuxed?.url || lowResVideoOnly?.url || '';
         if (!thumbSrc) {
           const src = v.currentSrc || '';
           if (src && !src.startsWith('blob:') && !src.includes('.m3u8')) {
@@ -1838,9 +2360,14 @@ async function renderVideo(id) {
       const t = ratio * v.duration;
       previewTime.textContent = fmtTime(t);
       const wrapRect = playerWrap.getBoundingClientRect();
-      const x = ev.clientX - wrapRect.left;
-      // Set on the wrap so both the seek preview and the progress strip's
-      // hover line can read it via CSS variable inheritance.
+      const rawX = ev.clientX - wrapRect.left;
+      // Clamp the X used for the preview tooltip so it can't slide off the
+      // player edges. The preview is 120px wide and centred on the cursor
+      // (translateX(-50%)), so it needs 60px of room on each side. The hover
+      // line just sits at the cursor and doesn't need clamping — but keeping
+      // them in sync via the same variable is fine for our 120px tooltip.
+      const half = 60;
+      const x = Math.max(half, Math.min(wrapRect.width - half, rawX));
       playerWrap.style.setProperty('--seek-x', x + 'px');
       preview.classList.add('show');
       seekThumb(t);
@@ -1861,9 +2388,63 @@ async function renderVideo(id) {
 
   let lastResumeSave = 0;
   const pbFill = view.querySelector('#pb-fill');
+  const pbBuffered = view.querySelector('#pb-buffered');
+  const playerWrapEl = view.querySelector('#player-wrap');
+
+  // rAF-driven progress updates instead of `timeupdate`. `timeupdate` only
+  // fires ~4Hz and stops entirely while the video is buffering, which made
+  // the progress bar feel laggy and look frozen mid-buffer. With rAF we get
+  // smooth ~60Hz updates and the buffered-range indicator keeps moving even
+  // when playback is stalled — so the user can see that data is loading.
+  let pbRafId = null;
+  let pbAlive = true;
+  const updatePb = () => {
+    if (!pbAlive) return;
+    const d = v.duration;
+    if (d) {
+      if (pbFill) pbFill.style.width = ((v.currentTime / d) * 100).toFixed(3) + '%';
+      if (pbBuffered && v.buffered && v.buffered.length) {
+        // Use the buffered range that contains the current time, falling back
+        // to the last range if the playhead is between gaps.
+        let bufEnd = 0;
+        for (let i = 0; i < v.buffered.length; i++) {
+          const start = v.buffered.start(i);
+          const end = v.buffered.end(i);
+          if (start <= v.currentTime && end > bufEnd) bufEnd = end;
+        }
+        if (!bufEnd) bufEnd = v.buffered.end(v.buffered.length - 1);
+        pbBuffered.style.width = ((bufEnd / d) * 100).toFixed(3) + '%';
+      }
+    }
+    pbRafId = requestAnimationFrame(updatePb);
+  };
+  pbRafId = requestAnimationFrame(updatePb);
+
+  // Buffering visual: pulse the strip so the user has feedback that the
+  // player isn't dead, just waiting on bytes. waiting/stalled add the class,
+  // playing/canplay/seeked clear it.
+  const onWaiting = () => playerWrapEl?.classList.add('buffering');
+  const onResumed = () => playerWrapEl?.classList.remove('buffering');
+  v.addEventListener('waiting', onWaiting);
+  v.addEventListener('stalled', onWaiting);
+  v.addEventListener('playing', onResumed);
+  v.addEventListener('canplay', onResumed);
+  v.addEventListener('seeked',  onResumed);
+
+  v.addEventListener('emptied', () => {
+    pbAlive = false;
+    if (pbRafId) cancelAnimationFrame(pbRafId);
+    v.removeEventListener('waiting', onWaiting);
+    v.removeEventListener('stalled', onWaiting);
+    v.removeEventListener('playing', onResumed);
+    v.removeEventListener('canplay', onResumed);
+    v.removeEventListener('seeked',  onResumed);
+  }, { once: true });
+
+  // Resume save still rides on `timeupdate` — it's throttled to 5s anyway so
+  // the lower frequency is fine, and it only matters during playback.
   v.addEventListener('timeupdate', () => {
     const t = v.currentTime, d = v.duration;
-    if (pbFill && d) pbFill.style.width = ((t / d) * 100).toFixed(2) + '%';
     if (!d || t < 5) return;
     const now = Date.now();
     if (now - lastResumeSave >= 5000) {
@@ -1896,16 +2477,98 @@ async function renderVideo(id) {
     }
   };
 
-  view.querySelectorAll('.related .row').forEach(r => {
-    r.onclick = () => go('video', r.dataset.id);
+  // Bind row clicks within the related list. Called every time we re-render
+  // the list (e.g. when the user switches sidebar source).
+  const bindRelatedRowClicks = () => {
+    view.querySelectorAll('.related .row').forEach(r => {
+      r.onclick = () => go('video', r.dataset.id);
+    });
+  };
+  bindRelatedRowClicks();
+
+  // Sidebar source switching: Up next / Subs / History. Each shares the
+  // .related container's layout (list/overlay/thumbs) and the relatedRow
+  // formatter — only the items differ.
+  const relatedListEl = view.querySelector('.related');
+  // Generation counter so a slow Subs fetch can't stomp on a tab the user
+  // has since switched away from.
+  let sourceGen = 0;
+  const renderSource = async (src) => {
+    const gen = ++sourceGen;
+    relatedSource = src;
+    localStorage.setItem('related-source', src);
+    relatedListEl.dataset.src = src;
+    view.querySelectorAll('.related-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.rt === src);
+    });
+    const labelEl = view.querySelector('#related-active-label');
+    if (labelEl) {
+      labelEl.textContent = src === 'subs' ? 'Subs' : (src === 'history' ? 'History' : 'Up next');
+    }
+
+    if (src === 'related') {
+      let items = (data.relatedStreams || []).slice(0, 16);
+      // yt-dlp doesn't expose related videos, so when our primary data source
+      // is yt-dlp the array is empty. Lazy-fetch from Piped only on demand
+      // (per video, cached for the session) so the user actually gets a
+      // populated Up next tab. Same fetch for users who got an empty array
+      // from Piped — harmless retry.
+      if (!items.length) {
+        relatedListEl.innerHTML = `<div class="loader" style="padding:30px">Loading</div>`;
+        items = await fetchSidebarRelated(id);
+        if (gen !== sourceGen) return;
+        // Stash on data so subsequent tab switches use the cached result
+        // without another sessionStorage round trip.
+        data.relatedStreams = items;
+      }
+      relatedListEl.innerHTML = items.length
+        ? items.slice(0, 16).map(relatedRow).join('')
+        : `<div class="empty-mini">No related videos</div>`;
+      bindRelatedRowClicks();
+      return;
+    }
+
+    if (src === 'history') {
+      const items = getHistory().slice(0, 24).map(h => ({
+        url: `https://youtube.com/watch?v=${h.id}`,
+        title: h.title,
+        thumbnail: h.thumbnail,
+        duration: h.duration,
+        uploaderName: h.uploaderName,
+        views: h.views,
+      }));
+      relatedListEl.innerHTML = items.length
+        ? items.map(relatedRow).join('')
+        : `<div class="empty-mini">Nothing watched yet</div>`;
+      bindRelatedRowClicks();
+      return;
+    }
+
+    if (src === 'subs') {
+      relatedListEl.innerHTML = `<div class="loader" style="padding:30px">Loading subscriptions</div>`;
+      const items = await fetchSidebarSubs();
+      // Bail if the user switched tabs while we were fetching.
+      if (gen !== sourceGen) return;
+      relatedListEl.innerHTML = items.length
+        ? items.slice(0, 24).map(relatedRow).join('')
+        : `<div class="empty-mini">No subscription videos</div>`;
+      bindRelatedRowClicks();
+      return;
+    }
+  };
+  view.querySelectorAll('.related-tab').forEach(t => {
+    t.addEventListener('click', () => renderSource(t.dataset.rt));
   });
+  // If the user previously selected Subs/History, the static initial HTML
+  // showed a loader — kick off the actual render now.
+  if (relatedSource !== 'related') renderSource(relatedSource);
 
   const toggle = view.querySelector('#related-toggle');
   const playerPage = view.querySelector('.player-page');
   toggle.onclick = () => {
     const nowCollapsed = playerPage.classList.toggle('related-collapsed');
     localStorage.setItem('related-collapsed', nowCollapsed ? '1' : '0');
-    toggle.title = nowCollapsed ? 'Show up next' : 'Hide up next';
+    toggle.title = nowCollapsed ? 'Show sidebar' : 'Hide sidebar';
   };
 
   const commentsToggle = view.querySelector('#comments-toggle');
@@ -2235,7 +2898,29 @@ async function renderVideo(id) {
 
 async function renderChannel(id) {
   const ch = await api.channel(id);
-  const items = ch.relatedStreams || [];
+  // Stateful: items grow as the user loads more pages; the active sort
+  // determines render order each time.
+  const state = {
+    items: [...(ch.relatedStreams || [])],
+    nextpage: ch.nextpage || null,
+    sort: 'latest',
+    loading: false,
+  };
+
+  const SORTS = [
+    { key: 'latest',  label: 'Latest'  },
+    { key: 'popular', label: 'Popular' },
+    { key: 'oldest',  label: 'Oldest'  },
+  ];
+
+  const sortItems = (items, sort) => {
+    const arr = [...items];
+    if (sort === 'popular') arr.sort((a, b) => (b.views || 0) - (a.views || 0));
+    else if (sort === 'oldest') arr.sort((a, b) => (a.uploaded || 0) - (b.uploaded || 0));
+    else arr.sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0));
+    return arr;
+  };
+
   view.innerHTML = `
     <div class="channel-page">
       ${ch.bannerUrl ? `<div class="channel-banner"><img src="${escapeAttr(ch.bannerUrl)}" alt="" /></div>` : ''}
@@ -2243,16 +2928,73 @@ async function renderChannel(id) {
         ${ch.avatarUrl ? `<img class="channel-avatar" src="${escapeAttr(ch.avatarUrl)}" alt="" />` : `<div class="channel-avatar"></div>`}
         <div class="channel-meta">
           <h1>${escape(ch.name || '')}</h1>
-          <div class="channel-stats">${ch.subscriberCount != null ? fmtNumber(ch.subscriberCount) + ' subscribers' : ''}${items.length ? ' · ' + items.length + ' videos' : ''}</div>
+          <div class="channel-stats">${ch.subscriberCount != null ? fmtNumber(ch.subscriberCount) + ' subscribers' : ''}${state.items.length ? ' · ' + state.items.length + ' videos' : ''}</div>
           ${ch.description ? `<div class="channel-desc">${escape(ch.description)}</div>` : ''}
         </div>
       </div>
-      ${items.length
-        ? `<div class="grid">${items.map(videoCard).join('')}</div>`
-        : `<div class="empty">No videos to show.</div>`}
+      ${state.items.length ? `
+        <div class="channel-filters" role="tablist" aria-label="Sort videos">
+          ${SORTS.map(s => `<button class="channel-filter ${s.key === state.sort ? 'active' : ''}" data-sort="${s.key}" role="tab" aria-selected="${s.key === state.sort}">${s.label}</button>`).join('')}
+        </div>
+        <div class="grid" id="channel-grid"></div>
+        <div class="channel-loadmore">
+          <button id="ch-load-more" class="loadmore-btn"${state.nextpage ? '' : ' hidden'}>Load more videos</button>
+          <div class="loadmore-status" id="ch-load-status" aria-live="polite"></div>
+        </div>
+      ` : `<div class="empty">No videos to show.</div>`}
     </div>
   `;
-  attachCardClicks();
+
+  const gridEl = view.querySelector('#channel-grid');
+  const moreBtn = view.querySelector('#ch-load-more');
+  const statusEl = view.querySelector('#ch-load-status');
+
+  const renderGrid = () => {
+    if (!gridEl) return;
+    gridEl.innerHTML = sortItems(state.items, state.sort).map(videoCard).join('');
+    attachCardClicks();
+  };
+  renderGrid();
+
+  view.querySelectorAll('.channel-filter').forEach(btn => {
+    btn.onclick = () => {
+      if (state.sort === btn.dataset.sort) return;
+      state.sort = btn.dataset.sort;
+      view.querySelectorAll('.channel-filter').forEach(b => {
+        const on = b.dataset.sort === state.sort;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      renderGrid();
+    };
+  });
+
+  if (moreBtn) {
+    moreBtn.onclick = async () => {
+      if (state.loading || !state.nextpage) return;
+      state.loading = true;
+      moreBtn.disabled = true;
+      const prevLabel = moreBtn.textContent;
+      moreBtn.textContent = 'Loading…';
+      try {
+        const next = await api.channelNext(id, state.nextpage);
+        const newItems = next?.relatedStreams || [];
+        state.items.push(...newItems);
+        state.nextpage = next?.nextpage || null;
+        renderGrid();
+        if (!state.nextpage) {
+          moreBtn.hidden = true;
+          if (statusEl) statusEl.textContent = 'No more videos.';
+        }
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Could not load more videos.';
+      } finally {
+        state.loading = false;
+        moreBtn.disabled = false;
+        moreBtn.textContent = prevLabel;
+      }
+    };
+  }
 }
 
 // ---------- Card templates ----------
@@ -2266,10 +3008,77 @@ function videoCard(item) {
       </div>
       <div class="meta">
         <div class="title">${escape(item.title || '')}</div>
-        <div class="sub">${escape(item.uploaderName || '')}${item.views != null ? ' · ' + fmtViews(item.views) : ''}</div>
+        <div class="sub"><span class="ch">${escape(item.uploaderName || '')}</span>${item.views != null ? '<span class="dot">·</span>' + fmtViews(item.views) : ''}</div>
       </div>
     </div>
   `;
+}
+
+// Lazy-fetch related videos from Piped for the sidebar "Up next" tab.
+// Needed because the yt-dlp data path returns relatedStreams: [] (yt-dlp
+// doesn't expose related videos), so without this the Up next tab is
+// permanently empty whenever yt-dlp is the primary fetcher. Cached by
+// video id in sessionStorage for the duration of the session.
+async function fetchSidebarRelated(videoId) {
+  if (!videoId) return [];
+  const KEY = `sidebar-related:${videoId}`;
+  try {
+    const raw = sessionStorage.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  let items = [];
+  try {
+    const piped = await api.streams(videoId);
+    if (piped && Array.isArray(piped.relatedStreams)) items = piped.relatedStreams;
+  } catch {}
+  try { sessionStorage.setItem(KEY, JSON.stringify(items)); } catch {}
+  return items;
+}
+
+// Aggregate the latest videos from the user's subscriptions for the sidebar
+// "Subs" tab. Cached in sessionStorage with a 5-minute TTL so flipping tabs
+// doesn't re-trigger the (expensive, parallel-fanout) channel fetches.
+async function fetchSidebarSubs() {
+  const CACHE_KEY = 'sidebar-subs-feed';
+  const TTL_MS = 5 * 60 * 1000;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (Date.now() - parsed.t) < TTL_MS && Array.isArray(parsed.items)) {
+        return parsed.items;
+      }
+    }
+  } catch {}
+
+  let items = [];
+  if (isLoggedIn()) {
+    try {
+      const feed = await api.feed();
+      if (Array.isArray(feed)) items = feed;
+    } catch {}
+  } else {
+    const subs = getLocalSubs();
+    if (subs.length) {
+      const all = [];
+      await Promise.all(subs.map(async c => {
+        try {
+          const ch = await api.channel(c.id);
+          for (const r of (ch.relatedStreams || []).slice(0, 4)) all.push(r);
+        } catch {}
+      }));
+      all.sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0));
+      items = all;
+    }
+  }
+
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), items }));
+  } catch {}
+  return items;
 }
 
 function relatedRow(item) {
@@ -2282,7 +3091,7 @@ function relatedRow(item) {
       </div>
       <div class="info">
         <div class="title">${escape(item.title || '')}</div>
-        <div class="sub">${escape(item.uploaderName || '')}${item.views != null ? ' · ' + fmtViews(item.views) : ''}</div>
+        <div class="sub"><span class="ch">${escape(item.uploaderName || '')}</span>${item.views != null ? '<span class="dot">·</span>' + fmtViews(item.views) : ''}</div>
       </div>
     </div>
   `;
@@ -2476,17 +3285,37 @@ function attachCustomControls(v, root, data = {}) {
   const savedVol = parseFloat(localStorage.getItem('cc-volume') || '1');
   v.volume = isFinite(savedVol) ? savedVol : 1;
   volSlider.value = v.volume;
-  const updateMuteIcon = () => wrap.classList.toggle('muted', v.muted || v.volume === 0);
+  // HD playback uses a video-only stream + a sidecar <audio> element, so the
+  // <video> itself is permanently `muted` (sound comes from the sidecar).
+  // The old icon logic keyed off v.muted, so it ALWAYS showed the muted
+  // speaker during HD playback even though audio was clearly playing. The
+  // honest signal is "is there actually any sound" — i.e. volume 0, or, when
+  // there's NO sidecar, the native muted flag. Mute is modelled as volume 0
+  // (with memory) so it works identically for sidecar and direct playback —
+  // player.js mirrors v.volume onto the sidecar on every volumechange.
+  const isMuted = () => v.volume === 0 || (!v._audio && v.muted);
+  let preMuteVol = null;
+  const updateMuteIcon = () => wrap.classList.toggle('muted', isMuted());
   volSlider.oninput = () => {
     v.volume = Number(volSlider.value);
-    v.muted = v.volume === 0;
+    if (!v._audio) v.muted = v.volume === 0;
     localStorage.setItem('cc-volume', String(v.volume));
     updateMuteIcon();
   };
   muteBtn.onclick = (e) => {
     e.stopPropagation();
-    v.muted = !v.muted;
-    if (!v.muted && v.volume === 0) { v.volume = 0.5; volSlider.value = 0.5; }
+    if (isMuted()) {
+      const restore = (preMuteVol && preMuteVol > 0) ? preMuteVol : 0.5;
+      v.volume = restore;
+      volSlider.value = restore;
+      if (!v._audio) v.muted = false;
+    } else {
+      preMuteVol = v.volume || 0.5;
+      v.volume = 0;
+      volSlider.value = 0;
+      if (!v._audio) v.muted = true;
+    }
+    localStorage.setItem('cc-volume', String(v.volume));
     updateMuteIcon();
     updateVerticalFill();
   };
@@ -2502,12 +3331,12 @@ function attachCustomControls(v, root, data = {}) {
 
   const updateVerticalFill = () => {
     if (!volFill) return;
-    const pct = (v.muted ? 0 : v.volume) * 100;
+    const pct = (isMuted() ? 0 : v.volume) * 100;
     volFill.style.height = pct.toFixed(1) + '%';
   };
   const flashIndicator = () => {
     if (!volInd) return;
-    volInd.textContent = (v.muted ? 0 : Math.round(v.volume * 100)) + '%';
+    volInd.textContent = (isMuted() ? 0 : Math.round(v.volume * 100)) + '%';
     volInd.classList.add('show');
     clearTimeout(indHideTimer);
     indHideTimer = setTimeout(() => volInd.classList.remove('show'), 900);
@@ -2884,7 +3713,52 @@ function attachCustomControls(v, root, data = {}) {
       ccList.addEventListener('click', (e) => e.stopPropagation());
       document.addEventListener('click', closeDrop);
 
-      let activeTrack = null;
+      // Custom caption overlay. Native ::cue rendering can't be repositioned
+      // by the user (it lives in a closed shadow DOM), so we suppress it
+      // (TextTrack.mode = 'hidden' → cues stay active and fire `cuechange`
+      // but the browser draws nothing) and paint the active cue text into
+      // our own absolutely-positioned, draggable box instead.
+      const subBox = wrap.querySelector('#cc-subs');
+      const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+      // Place the box at the user's saved normalized centre (a fraction of
+      // the player's width/height). Clamped so it can never be dragged fully
+      // off the video; translate(-50%,-50%) in CSS makes {x,y} mean "centre".
+      const applyStoredPos = () => {
+        if (!subBox) return;
+        const p = currentSettings.subtitlePos || { x: 0.5, y: 0.88 };
+        const x = clamp(typeof p.x === 'number' ? p.x : 0.5,  0.03, 0.97);
+        const y = clamp(typeof p.y === 'number' ? p.y : 0.88, 0.05, 0.97);
+        subBox.style.left = (x * 100) + '%';
+        subBox.style.top  = (y * 100) + '%';
+      };
+      applyStoredPos();
+
+      // VTT cue text can carry markup/voice tags (<v Bob>, <i>, …). Strip to
+      // plain text + newlines; the box owns the visual styling.
+      const cueText = (cue) => {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = ((cue && cue.text) || '').replace(/\r?\n/g, '<br>');
+        return (tmp.textContent || '').trim();
+      };
+      const paintCues = (tt) => {
+        if (!subBox) return;
+        const active = tt && tt.activeCues ? Array.from(tt.activeCues) : [];
+        const txt = active.map(cueText).filter(Boolean).join('\n');
+        subBox.textContent = txt;
+        subBox.classList.toggle('has-text', !!txt);
+      };
+
+      let activeTrack = null;   // the <track> element
+      let activeTT = null;      // its TextTrack object
+      let onCueChange = null;
+      const detachCues = () => {
+        if (activeTT && onCueChange) activeTT.removeEventListener('cuechange', onCueChange);
+        onCueChange = null;
+        activeTT = null;
+        if (subBox) { subBox.textContent = ''; subBox.classList.remove('has-text'); }
+      };
+
       ccList.querySelectorAll('.cc-dropdown-item').forEach(it => {
         it.onclick = async () => {
           const key = it.dataset.ccCc;
@@ -2892,6 +3766,7 @@ function attachCustomControls(v, root, data = {}) {
           ccLabel.textContent = it.textContent;
           closeDrop();
           for (const t of v.textTracks) t.mode = 'disabled';
+          detachCues();
           if (activeTrack && activeTrack.parentNode) activeTrack.parentNode.removeChild(activeTrack);
           activeTrack = null;
           if (key === 'off') return;
@@ -2915,15 +3790,67 @@ function attachCustomControls(v, root, data = {}) {
             v.appendChild(track);
             activeTrack = track;
             track.addEventListener('load', () => {
+              // 'hidden' (not 'showing') keeps cues live so `cuechange`
+              // fires and activeCues populates, but the browser draws no
+              // native captions — ours are the only ones on screen.
+              let tt = null;
               for (const t of v.textTracks) {
-                t.mode = (t.label === track.label) ? 'showing' : 'disabled';
+                if (t.label === track.label) { t.mode = 'hidden'; tt = t; }
+                else t.mode = 'disabled';
               }
+              if (!tt) return;
+              activeTT = tt;
+              onCueChange = () => paintCues(tt);
+              tt.addEventListener('cuechange', onCueChange);
+              paintCues(tt); // paint immediately in case a cue is already active
             }, { once: true });
           } catch (e) {
             console.warn('Subtitle load failed:', e);
           }
         };
       });
+
+      // ---------- Drag-to-reposition ----------
+      // The whole caption box is the drag handle. Persist only on release so
+      // we don't hammer the settings file on every mouse move.
+      if (subBox) {
+        let dragging = false;
+        let startX = 0, startY = 0, baseX = 0.5, baseY = 0.88;
+        const onMove = (e) => {
+          if (!dragging) return;
+          const r = wrap.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          const nx = clamp(baseX + (e.clientX - startX) / r.width,  0.03, 0.97);
+          const ny = clamp(baseY + (e.clientY - startY) / r.height, 0.05, 0.97);
+          subBox.style.left = (nx * 100) + '%';
+          subBox.style.top  = (ny * 100) + '%';
+        };
+        const onUp = () => {
+          if (!dragging) return;
+          dragging = false;
+          subBox.classList.remove('dragging');
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          const x = parseFloat(subBox.style.left) / 100;
+          const y = parseFloat(subBox.style.top) / 100;
+          currentSettings.subtitlePos = { x, y };
+          saveSettings(currentSettings);
+        };
+        subBox.addEventListener('mousedown', (e) => {
+          // Swallow the click so it doesn't reach the video (play/pause).
+          e.preventDefault();
+          e.stopPropagation();
+          dragging = true;
+          subBox.classList.add('dragging');
+          startX = e.clientX;
+          startY = e.clientY;
+          const p = currentSettings.subtitlePos || { x: 0.5, y: 0.88 };
+          baseX = clamp(typeof p.x === 'number' ? p.x : 0.5,  0.03, 0.97);
+          baseY = clamp(typeof p.y === 'number' ? p.y : 0.88, 0.05, 0.97);
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        });
+      }
     }
   }
 }
@@ -3605,11 +4532,6 @@ function showSettings() {
             <h3><span class="dot"></span>Theme</h3>
             <div class="settings-label">Color</div>
             <div class="theme-options">${themeBtns}</div>
-            <div class="settings-label">Background style</div>
-            <div class="theme-options">
-              <button class="theme-pill ${s.bgMode === 'gradient' ? 'active' : ''}" data-bgmode="gradient">Gradient</button>
-              <button class="theme-pill ${s.bgMode === 'solid' ? 'active' : ''}" data-bgmode="solid">Solid colour</button>
-            </div>
             <div class="settings-label">Background motion <span class="hint">(gradient only)</span></div>
             <div class="theme-options">
               <button class="theme-pill ${s.motion === 'still' ? 'active' : ''}" data-motion="still">Still</button>
@@ -3663,16 +4585,8 @@ function showSettings() {
         <div class="settings-pane" data-pane="window" role="tabpanel">
           <section class="settings-section">
             <h3><span class="dot"></span>Window</h3>
-            <div class="settings-label">Backdrop effect <span class="hint">(Mica / Acrylic require Win 11)</span></div>
-            <div class="theme-options">
-              <button class="theme-pill ${s.material === 'none' ? 'active' : ''}" data-mat="none">None</button>
-              <button class="theme-pill ${s.material === 'mica' ? 'active' : ''}" data-mat="mica">Mica</button>
-              <button class="theme-pill ${s.material === 'acrylic' ? 'active' : ''}" data-mat="acrylic">Acrylic</button>
-              <button class="theme-pill ${s.material === 'tabbed' ? 'active' : ''}" data-mat="tabbed">Tabbed</button>
-              <button class="theme-pill ${s.material === 'frosted' ? 'active' : ''}" data-mat="frosted">Frosted glass</button>
-            </div>
-            <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">
-              <strong style="color:var(--text)">Tip:</strong> pair a backdrop with the See-through slider in the Glass tab to actually see your desktop behind the window.
+            <div class="hint" style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+              <strong style="color:var(--text)">See-through?</strong> It's a single control now — <strong style="color:var(--text)">Glass &amp; Opacity → Background</strong> (Acrylic = frosted desktop, Clear glass = sharp desktop). The old separate “Backdrop effect” was removed because it fought that setting and bled the desktop into the UI.
             </div>
             <div class="settings-label">Up next width <span class="val" id="s-relw-val">${s.relatedWidth || 380}px</span></div>
             <input type="range" id="s-relw" class="settings-slider" min="280" max="540" value="${s.relatedWidth || 380}" />
@@ -3691,14 +4605,27 @@ function showSettings() {
         <div class="settings-pane" data-pane="glass" role="tabpanel">
           <section class="settings-section">
             <h3><span class="dot"></span>Glass &amp; opacity</h3>
-            <div class="settings-label"><span>Blur</span><span class="val" id="s-blur-val">${s.blur}px</span></div>
-            <input type="range" id="s-blur" class="settings-slider" min="0" max="40" value="${s.blur}" />
-            <div class="settings-label"><span>Intensity</span><span class="val" id="s-glass-val">${s.glassAlpha}%</span></div>
-            <input type="range" id="s-glass" class="settings-slider" min="0" max="20" value="${s.glassAlpha}" />
-            <div class="settings-label"><span>See-through <span class="hint">(window background; pair with Mica/Acrylic for real desktop showthrough)</span></span><span class="val" id="s-seethru-val">${s.seeThrough || 0}%</span></div>
-            <input type="range" id="s-seethru" class="settings-slider" min="0" max="100" value="${s.seeThrough || 0}" />
-            <div class="settings-label"><span>Content opacity <span class="hint">(everything, including text)</span></span><span class="val" id="s-opacity-val">${s.windowOpacity}%</span></div>
-            <input type="range" id="s-opacity" class="settings-slider" min="60" max="100" value="${s.windowOpacity}" />
+            <div class="settings-label">Background <span class="hint">(see-through modes show your desktop in the empty space)</span></div>
+            <div class="theme-options">
+              <button class="theme-pill ${s.bgMode === 'gradient' ? 'active' : ''}" data-bgmode="gradient">Gradient</button>
+              <button class="theme-pill ${s.bgMode === 'solid' ? 'active' : ''}" data-bgmode="solid">Solid colour</button>
+              <button class="theme-pill ${s.bgMode === 'acrylic' ? 'active' : ''}" data-bgmode="acrylic" title="Windows OS acrylic — the real desktop shows FROSTED/blurred in the empty areas, UI stays solid.">Acrylic</button>
+              <button class="theme-pill ${s.bgMode === 'mica' ? 'active' : ''}" data-bgmode="mica" title="Windows OS Mica — subtle desktop-wallpaper tint in the empty areas, UI stays solid.">Mica</button>
+              <button class="theme-pill ${s.bgMode === 'gaussian' ? 'active' : ''}" data-bgmode="gaussian" title="Windows OS Tabbed material — another frosted desktop look in the empty areas, UI stays solid.">Gaussian</button>
+              <button class="theme-pill ${s.bgMode === 'clear' ? 'active' : ''}" data-bgmode="clear" title="Transparent window — the real desktop shows SHARP in the empty areas, UI stays solid. Restart to toggle.">Clear glass</button>
+            </div>
+            <div id="clear-restart-note" class="settings-restart-note" style="display:none">
+              This see-through background needs a restart to take effect (the window must be recreated transparent).
+              <button id="clear-restart-btn" type="button">Restart now</button>
+            </div>
+            <div class="settings-label" id="bgopacity-label" style="margin-top:14px"><span>Background opacity <span class="hint">(fades the Gradient background — UI &amp; text stay solid)</span></span><span class="val" id="s-bgopacity-val">${typeof s.bgOpacity === 'number' ? s.bgOpacity : 100}%</span></div>
+            <input type="range" id="s-bgopacity" class="settings-slider" min="0" max="100" value="${typeof s.bgOpacity === 'number' ? s.bgOpacity : 100}" />
+            <div class="settings-label" id="clearop-label" style="margin-top:14px;display:none"><span>Background dim <span class="hint">(Acrylic / Clear — 0 = full desktop, higher = darker veil over the desktop; UI stays solid)</span></span><span class="val" id="s-clearop-val">${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}%</span></div>
+            <input type="range" id="s-clearop" class="settings-slider" min="0" max="70" value="${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}" style="display:none" />
+            <div class="settings-label" id="acrylicalpha-label" style="margin-top:14px;display:none"><span>Surface see-through <span class="hint">(Acrylic / Clear — 0 = solid cards, higher = desktop shows through the cards too)</span></span><span class="val" id="s-acrylicalpha-val">${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}%</span></div>
+            <input type="range" id="s-acrylicalpha" class="settings-slider" min="0" max="75" value="${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}" style="display:none" />
+            <div class="settings-label" id="acrylicblur-label" style="margin-top:14px;display:none"><span>Blur <span class="hint">(Acrylic / Clear — extra frost on the see-through cards; 0 = off)</span></span><span class="val" id="s-acrylicblur-val">${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}px</span></div>
+            <input type="range" id="s-acrylicblur" class="settings-slider" min="0" max="40" value="${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}" style="display:none" />
           </section>
         </div>
 
@@ -3809,14 +4736,9 @@ function showSettings() {
     };
   });
   modalBody.querySelector('#s-glow').onchange = (e) => update({ cardGlow: e.target.checked });
-
-  modalBody.querySelectorAll('.theme-pill[data-mat]').forEach(btn => {
-    btn.onclick = () => {
-      modalBody.querySelectorAll('.theme-pill[data-mat]').forEach(b => b.classList.toggle('active', b === btn));
-      update({ material: btn.dataset.mat });
-    };
-  });
-  // (Progress bar & Most Replayed handlers live on the player gear popover now)
+  // (The separate "Backdrop effect" material picker was removed — bgMode is
+  //  the single see-through control now. Progress bar & Most Replayed
+  //  handlers live on the player gear popover.)
 
   const setFill = (input) => {
     const min = Number(input.min) || 0;
@@ -3840,19 +4762,115 @@ function showSettings() {
       update({ [key]: v });
     };
   };
-  wireSlider('blur',    'blur',          (v) => v + 'px');
-  wireSlider('glass',   'glassAlpha',    (v) => v + '%');
-  wireSlider('seethru', 'seeThrough',    (v) => v + '%');
-  wireSlider('opacity', 'windowOpacity', (v) => v + '%');
+  // Only the background-opacity slider remains in Glass & Opacity — it
+  // affects ONLY the app background layer, never the UI/text. (Blur,
+  // Intensity and the whole-window opacity sliders were removed: they
+  // restyled every glass surface / dimmed the entire app including text,
+  // which is exactly what the user does NOT want.)
+  wireSlider('bgopacity', 'bgOpacity', (v) => v + '%');
 
-  // Background mode (gradient vs solid) — solid colour is now derived from
-  // the active theme's `bg` field, no separate picker.
+  // Background mode. Solid colour is derived from the active theme's `bg`
+  // field. Acrylic/Clear reveal the tint/blur slider; both use the
+  // transparent window, so switching in/out of a see-through mode needs a
+  // restart (transparent is fixed at window creation) — the note offers it.
+  const launchedTransparent = !!(window.app && window.app.launchedTransparent);
+  const refreshBgExtras = (mode) => {
+    const tintLabel = modalBody.querySelector('#bgtint-label');
+    const tintInput = modalBody.querySelector('#s-bgtint');
+    if (tintLabel) tintLabel.style.display = 'none';
+    if (tintInput) tintInput.style.display = 'none';
+    // Every see-through mode (Acrylic / Clear / Mica / Gaussian) uses the
+    // transparent window, so a restart is needed whenever you cross between
+    // a see-through mode and a normal (Gradient/Solid) one.
+    const seeThroughModes = ['acrylic', 'clear', 'mica', 'gaussian'];
+    const wantTransparent = seeThroughModes.includes(mode);
+    const note = modalBody.querySelector('#clear-restart-note');
+    if (note) note.style.display = (wantTransparent !== launchedTransparent) ? '' : 'none';
+    // Background opacity only does anything in Gradient mode (it fades the
+    // gradient layer). In Solid it'd be a same-colour no-op; in Acrylic/
+    // Clear there's no painted background. So only show it for Gradient —
+    // a slider that visibly does nothing reads as "broken".
+    const bgoLabel = modalBody.querySelector('#bgopacity-label');
+    const bgoInput = modalBody.querySelector('#s-bgopacity');
+    const showBgo = (mode === 'gradient');
+    if (bgoLabel) bgoLabel.style.display = showBgo ? '' : 'none';
+    if (bgoInput) bgoInput.style.display = showBgo ? '' : 'none';
+    // "Background dim" veil works in every see-through mode (Clear, Acrylic,
+    // Mica, Gaussian) — they all share the .bg veil via the acrylic CSS.
+    const coLabel = modalBody.querySelector('#clearop-label');
+    const coInput = modalBody.querySelector('#s-clearop');
+    const showCo = ['clear', 'acrylic', 'mica', 'gaussian'].includes(mode);
+    if (coLabel) coLabel.style.display = showCo ? '' : 'none';
+    if (coInput) coInput.style.display = showCo ? '' : 'none';
+    // "Surface see-through" + "Blur" — same set of modes (they all share the
+    // acrylic CSS via the mica/gaussian → acrylic remap in applySettings).
+    const aaLabel = modalBody.querySelector('#acrylicalpha-label');
+    const aaInput = modalBody.querySelector('#s-acrylicalpha');
+    if (aaLabel) aaLabel.style.display = showCo ? '' : 'none';
+    if (aaInput) aaInput.style.display = showCo ? '' : 'none';
+    const abLabel = modalBody.querySelector('#acrylicblur-label');
+    const abInput = modalBody.querySelector('#s-acrylicblur');
+    if (abLabel) abLabel.style.display = showCo ? '' : 'none';
+    if (abInput) abInput.style.display = showCo ? '' : 'none';
+  };
   modalBody.querySelectorAll('.theme-pill[data-bgmode]').forEach(btn => {
     btn.onclick = () => {
       modalBody.querySelectorAll('.theme-pill[data-bgmode]').forEach(b => b.classList.toggle('active', b === btn));
-      update({ bgMode: btn.dataset.bgmode });
+      const mode = btn.dataset.bgmode;
+      update({ bgMode: mode });
+      refreshBgExtras(mode);
     };
   });
+  refreshBgExtras(currentSettings.bgMode);
+
+  // Clear-glass "Surface see-through" slider. Higher = the UI cards/panels
+  // get more transparent so the desktop shows through them too (0 = solid
+  // UI, the default). applySettings turns clearSeeThrough into the
+  // --clear-opacity surface alpha.
+  const clearopInput = modalBody.querySelector('#s-clearop');
+  const clearopVal   = modalBody.querySelector('#s-clearop-val');
+  if (clearopInput) {
+    setFill(clearopInput);
+    clearopInput.oninput = () => {
+      const v = Number(clearopInput.value);
+      if (clearopVal) clearopVal.textContent = v + '%';
+      setFill(clearopInput);
+      update({ clearSeeThrough: v });
+    };
+  }
+  // Surface see-through: card/titlebar alpha in see-through modes. 0% = solid
+  // cards (current default), higher = the OS acrylic / real desktop shows
+  // through the UI too. Capped at 75 in the input so text never gets eaten.
+  const acrylicAlphaInput = modalBody.querySelector('#s-acrylicalpha');
+  const acrylicAlphaVal   = modalBody.querySelector('#s-acrylicalpha-val');
+  if (acrylicAlphaInput) {
+    setFill(acrylicAlphaInput);
+    acrylicAlphaInput.oninput = () => {
+      const v = Number(acrylicAlphaInput.value);
+      if (acrylicAlphaVal) acrylicAlphaVal.textContent = v + '%';
+      setFill(acrylicAlphaInput);
+      update({ acrylicCardAlpha: v });
+    };
+  }
+  // Blur slider: extra CSS backdrop-filter blur on the translucent surfaces.
+  // The scoped opt-in rule in styles.css only kicks in when this is > 0
+  // (root[data-acrylic-blur="on"]), so the default "no backdrop-filter"
+  // perf behavior is preserved unless the user explicitly enables it.
+  const acrylicBlurInput = modalBody.querySelector('#s-acrylicblur');
+  const acrylicBlurVal   = modalBody.querySelector('#s-acrylicblur-val');
+  if (acrylicBlurInput) {
+    setFill(acrylicBlurInput);
+    acrylicBlurInput.oninput = () => {
+      const v = Number(acrylicBlurInput.value);
+      if (acrylicBlurVal) acrylicBlurVal.textContent = v + 'px';
+      setFill(acrylicBlurInput);
+      update({ acrylicBlur: v });
+    };
+  }
+  const clearRestartBtn = modalBody.querySelector('#clear-restart-btn');
+  if (clearRestartBtn) {
+    clearRestartBtn.onclick = () => { if (window.app && window.app.relaunchApp) window.app.relaunchApp(); };
+  }
 
   modalBody.querySelector('#s-resume').onchange = (e) => {
     update({ askResume: e.target.checked });
@@ -3970,8 +4988,10 @@ function showSettings() {
   const relwInput = modalBody.querySelector('#s-relw');
   const relwVal = modalBody.querySelector('#s-relw-val');
   if (relwInput) {
+    setFill(relwInput);                         // same pink-fill as every other slider
     relwInput.oninput = () => {
       relwVal.textContent = relwInput.value + 'px';
+      setFill(relwInput);
       update({ relatedWidth: Number(relwInput.value) });
     };
   }
@@ -4000,10 +5020,14 @@ function showSettings() {
 
   const pullW = modalBody.querySelector('#s-pull-w');
   const pullWVal = modalBody.querySelector('#s-pull-w-val');
-  pullW.oninput = () => {
-    pullWVal.textContent = pullW.value + '%';
-    updatePullout({ width: Number(pullW.value) });
-  };
+  if (pullW) {
+    setFill(pullW);                             // same pink-fill as every other slider
+    pullW.oninput = () => {
+      pullWVal.textContent = pullW.value + '%';
+      setFill(pullW);
+      updatePullout({ width: Number(pullW.value) });
+    };
+  }
 
   const hk = modalBody.querySelector('#s-pull-hk');
   hk.addEventListener('focus', () => { hk.value = ''; pullMsg.textContent = 'Press your hotkey…'; });

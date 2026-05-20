@@ -34,23 +34,42 @@ async function main() {
     return;
   }
 
-  const sizes = [16, 24, 32, 48, 64, 128, 256];
+  // Windows uses 16/20/24/32/40/48 in the taskbar/Alt-Tab depending on DPI
+  // and 96/256 for large/Explorer. Cover them all so no size is upscaled.
+  const sizes = [16, 24, 32, 40, 48, 64, 96, 128, 256];
   const svgBuf = fs.readFileSync(svg);
 
-  const pngs = await Promise.all(sizes.map(size =>
-    sharp(svgBuf, { density: Math.max(150, size * 2) })
-      .resize(size, size)
-      .png()
-      .toBuffer()
-  ));
+  // Render the SVG ONCE at a large master resolution (crisp vector raster),
+  // then downscale each icon size from that with the high-quality Lanczos
+  // kernel. Small taskbar sizes additionally get a mild sharpen so the play
+  // mark and rounded edge stay defined instead of going soft.
+  const MASTER = 1024;
+  const master = await sharp(svgBuf, { density: Math.round(MASTER * 96 / 256) })
+    .resize(MASTER, MASTER, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+
+  const pngs = await Promise.all(sizes.map(async size => {
+    let pipe = sharp(master).resize(size, size, {
+      kernel: sharp.kernel.lanczos3,
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    });
+    if (size <= 64) {
+      // sigma scales with how hard we downscaled — stronger crispening for
+      // the tiniest frames where softness is most visible.
+      pipe = pipe.sharpen({ sigma: size <= 32 ? 0.8 : 0.5 });
+    }
+    return pipe.png({ compressionLevel: 9 }).toBuffer();
+  }));
 
   const icoBuf = await toIco(pngs);
   fs.writeFileSync(ico, icoBuf);
 
   // 256-px PNG fallback (Electron uses this on some surfaces).
-  await sharp(svgBuf, { density: 600 })
-    .resize(256, 256)
-    .png()
+  await sharp(master)
+    .resize(256, 256, { kernel: sharp.kernel.lanczos3 })
+    .png({ compressionLevel: 9 })
     .toFile(png);
 
   console.log(`[build-icon] wrote ${path.relative(root, ico)} and ${path.relative(root, png)}`);

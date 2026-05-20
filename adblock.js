@@ -54,7 +54,7 @@ const AD_PATTERNS = [
   /\/youtubei\/v1\/log_event/i,
 ];
 
-let stats = { blocked: 0, allowed: 0 };
+let stats = { blocked: 0, allowed: 0, unproxied: 0 };
 
 function shouldBlock(url) {
   try {
@@ -66,15 +66,43 @@ function shouldBlock(url) {
   return false;
 }
 
+// Piped serves every thumbnail and channel avatar through its own image
+// proxy: https://<proxy-host>/<path>?host=<original-host>&<yt-params>. When
+// an instance's image proxy is down or overloaded (502s) ALL images break —
+// even though the assets on YouTube's CDN are reachable directly. Rewrite
+// proxied image requests back to their origin host so images survive a dead
+// proxy. Scoped strictly to image CDNs (ytimg/ggpht/googleusercontent) so the
+// video path (yt-dlp → direct googlevideo) is never touched. The rebuilt URL
+// carries no `host=` param, so it can't match again — no redirect loop.
+const IMG_HOSTS = /(^|\.)(ytimg\.com|ggpht\.com|googleusercontent\.com)$/i;
+
+function unproxyImageUrl(rawUrl) {
+  // Fast path: skip URL parsing for the >99% of requests with no host param.
+  if (rawUrl.indexOf('host=') === -1) return null;
+  try {
+    const u = new URL(rawUrl);
+    const host = u.searchParams.get('host');
+    if (!host || !IMG_HOSTS.test(host)) return null;
+    u.searchParams.delete('host');
+    const qs = u.searchParams.toString();
+    return `https://${host}${u.pathname}${qs ? '?' + qs : ''}`;
+  } catch {}
+  return null;
+}
+
 function setupAdblock(ses) {
   ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
     if (shouldBlock(details.url)) {
       stats.blocked++;
-      cb({ cancel: true });
-    } else {
-      stats.allowed++;
-      cb({});
+      return cb({ cancel: true });
     }
+    const direct = unproxyImageUrl(details.url);
+    if (direct) {
+      stats.unproxied++;
+      return cb({ redirectURL: direct });
+    }
+    stats.allowed++;
+    cb({});
   });
 }
 

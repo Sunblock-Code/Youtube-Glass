@@ -1,13 +1,57 @@
 const { app, BrowserWindow, session, shell, ipcMain, globalShortcut, screen, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { setupAdblock } = require('./adblock');
 const ytdlp = require('./ytdlp');
 const auth = require('./auth');
+
+// Electron's `transparent` is fixed at window-creation time — it can't be
+// toggled live. The "Clear glass" background mode needs a genuinely
+// transparent window, so we read the persisted bgMode synchronously BEFORE
+// creating the window and recreate (via app relaunch) when the user switches
+// in/out of clear mode. We read the same file the renderer actually writes
+// through preload's saveSettingsSync (%APPDATA%/youtube-glass on Windows).
+function readPersistedSettings() {
+  try {
+    const base = process.platform === 'win32'
+      ? (process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'))
+      : process.platform === 'darwin'
+        ? path.join(os.homedir(), 'Library', 'Application Support')
+        : (process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'));
+    return JSON.parse(fs.readFileSync(path.join(base, 'youtube-glass', 'glass-settings.json'), 'utf8'));
+  } catch { return null; }
+}
+// BOTH "Clear glass" and "Acrylic" need a genuinely transparent window.
+// Empirically (user-confirmed): setBackgroundMaterial('acrylic') only
+// actually renders the frosted desktop when the window is transparent —
+// it did nothing on a non-transparent window and "broke after restart".
+// So: transparent for clear OR acrylic. Clear uses no OS material (sharp
+// desktop); Acrylic adds setBackgroundMaterial('acrylic') on top of the
+// transparent window (real OS frost). Transparency is creation-time, so
+// switching in/out of either mode needs a restart.
+const SEE_THROUGH_MODES = ['clear', 'acrylic', 'mica', 'gaussian'];
+const launchedTransparent = (() => {
+  const s = readPersistedSettings();
+  return !!(s && SEE_THROUGH_MODES.includes(s.bgMode));
+})();
 
 // Tell Windows this is a distinct app (separate from generic Electron) so the
 // taskbar can group/pin it correctly with the Glass icon. Must be set early —
 // before BrowserWindow creation. The string is an "AppUserModelID".
 app.setAppUserModelId('com.glass.youtube');
+
+// Set the runtime name so the Windows Volume Mixer shows "Glass" instead of
+// "Electron" / "youtube-glass". The Volume Mixer reads the display name from
+// the process that owns the audio session — see disable-features below.
+app.setName('Glass');
+
+// Chromium runs audio out-of-process by default ("Audio Service"), which means
+// the audio session in Volume Mixer belongs to an anonymous helper rather
+// than our main process. Disabling that feature folds the audio session into
+// the main process so it picks up the AppUserModelId / app name set above
+// and shows up as "Glass" in the mixer. Must be called before app.whenReady.
+app.commandLine.appendSwitch('disable-features', 'AudioServiceOutOfProcess');
 
 let mainWindow;
 
@@ -22,13 +66,11 @@ function createWindow() {
     height: 840,
     minWidth: 900,
     minHeight: 560,
-    // transparent:false so Aero Snap works on the titlebar and storage
-    // behavior stays predictable. Real desktop see-through still works
-    // when paired with Win11 Mica/Acrylic — those backdrops set the
-    // window's bg to transparent at the OS level without the side
-    // effects of Electron's transparent:true mode.
-    transparent: false,
-    backgroundColor: '#1a0d2e',
+    // Transparent for BOTH Clear and Acrylic (acrylic's OS material only
+    // renders on a transparent window — confirmed by the user). Clear has
+    // no material (sharp); Acrylic adds setBackgroundMaterial on top.
+    transparent: launchedTransparent,
+    backgroundColor: launchedTransparent ? '#00000000' : '#1a0d2e',
     icon: iconPath,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
@@ -41,6 +83,13 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Keep the renderer running at full speed when the window is hidden
+      // or off-screen. The pull-out feature (Alt+T) slides the window away
+      // and calls mainWindow.hide() — by default Chromium throttles hidden
+      // renderers, which suspends audio playback and stalls the player.js
+      // audio-sync drift loop. Disabling background throttling lets audio
+      // keep playing while the window is tucked away and keeps A/V aligned.
+      backgroundThrottling: false,
     },
   });
 
@@ -160,14 +209,25 @@ ipcMain.handle('window:set-material', (_e, material) => {
     if (typeof mainWindow.setBackgroundMaterial === 'function') {
       mainWindow.setBackgroundMaterial(m);
     }
-    // For the material to be visible, the window's background must be transparent.
+    // Keep the window background transparent when the window itself was
+    // launched transparent (Clear) OR a material is active (Acrylic/Mica —
+    // the OS material needs a #00000000 backgroundColor to show the frosted
+    // desktop). Only fall back to opaque when there's no see-through at all.
     if (typeof mainWindow.setBackgroundColor === 'function') {
-      mainWindow.setBackgroundColor(m === 'none' ? '#0a0612' : '#00000000');
+      const keepClear = launchedTransparent || m !== 'none';
+      mainWindow.setBackgroundColor(keepClear ? '#00000000' : '#0a0612');
     }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+// Relaunch the app — used when the user toggles Clear-glass mode, since
+// `transparent` can only be set at window creation.
+ipcMain.handle('app:relaunch', () => {
+  app.relaunch();
+  app.exit(0);
 });
 
 // ---- Pull-out / slide window ----
