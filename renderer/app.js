@@ -5570,19 +5570,19 @@ function showWatchPartyMenu() {
 function showWatchPartyStart() {
   openModal(`
     <h2 data-wp-modal>Watch together</h2>
-    <div class="modal-sub">Sync video playback with friends. Start a room and share the code, or join with a code someone sent you.</div>
+    <div class="modal-sub">Sync video playback with friends — share a code or join one.</div>
     <div class="auth-options">
       <button class="auth-card" id="wp-start" type="button">
         <span class="auth-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
           </svg>
         </span>
-        <div class="auth-text"><strong>Start a room</strong><span>You'll get a 6-character code to share with friends.</span></div>
+        <div class="auth-text"><strong>Start a room</strong><span>Get a 6-character code to share.</span></div>
       </button>
       <button class="auth-card" id="wp-join-toggle" type="button">
         <span class="auth-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
           </svg>
         </span>
@@ -5590,7 +5590,7 @@ function showWatchPartyStart() {
       </button>
     </div>
     <div id="wp-join-form" class="wp-join-form" hidden>
-      <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="6-char code" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+      <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
       <button id="wp-join-go" class="modal-btn primary">Join</button>
     </div>
     <div id="wp-msg" class="hint wp-msg"></div>

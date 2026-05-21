@@ -4558,16 +4558,24 @@ body.dragging-panel * { cursor: grabbing !important; }
 /* --- Auth method cards --- */
 .auth-options { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 8px; }
 .auth-card {
+  /* `text-align: left` overrides the user-agent default of `text-align:
+     center` that buttons inherit — without it, the description text inside
+     `.auth-text` looked centered even though the icon was left-aligned,
+     which read as misaligned/broken. */
+  text-align: left;
   display: flex; align-items: center; gap: 14px;
   padding: 14px 16px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   cursor: pointer;
+  color: var(--text);
+  font: inherit;
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .auth-card:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
 .auth-card:active { transform: scale(0.99); }
+.auth-card:disabled { opacity: 0.55; cursor: default; }
 .auth-card .auth-icon {
   width: 38px; height: 38px;
   border-radius: 10px;
@@ -4578,6 +4586,15 @@ body.dragging-panel * { cursor: grabbing !important; }
 .auth-card .auth-icon.google { background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 100%); color: white; }
 .auth-card .auth-icon.piped  { background: linear-gradient(135deg, #c084fc, #ec4899); color: white; }
 .auth-card .auth-icon.takeout{ background: rgba(255,255,255,0.10); color: var(--text); border: 1px solid var(--glass-border); }
+/* Default look for plain `.auth-icon` (used by the watch-together modal).
+   Scoped with :not() so the existing google / piped / takeout variants
+   stay untouched — otherwise their borderless brand-coloured circles
+   would pick up a stray purple border. */
+.auth-card .auth-icon:not(.google):not(.piped):not(.takeout) {
+  color: var(--accent);
+  background: rgba(192, 132, 252, 0.12);
+  border: 1px solid rgba(192, 132, 252, 0.25);
+}
 .auth-card .auth-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .auth-card .auth-text strong { font-size: 14px; font-weight: 600; }
 .auth-card .auth-text span { font-size: 12px; color: var(--muted); }
@@ -5112,36 +5129,58 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .wp-badge[hidden] { display: none; }
 
-/* Modal content — start screen */
+/* Modal content — start screen
+   Card descriptions ride a slightly wider line-height than the default flex
+   children so they don't crowd the title above. */
+.auth-card .auth-text strong + span { margin-top: 2px; line-height: 1.45; }
+
 .wp-join-form {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
   align-items: stretch;
 }
 .wp-join-form input {
-  flex: 1;
-  padding: 10px 14px;
-  border-radius: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: var(--glass);
   color: var(--text);
   font-family: "Segoe UI Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 16px;
-  letter-spacing: 3px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 4px;
   text-transform: uppercase;
   text-align: center;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.wp-join-form input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 2px;
+  opacity: 0.55;
 }
 .wp-join-form input:focus {
   outline: none;
   border-color: var(--accent);
+  background: var(--glass-strong);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.wp-join-form .modal-btn {
+  height: 44px;
+  padding: 0 22px;
+  flex-shrink: 0;
+  margin: 0;
 }
 .wp-msg {
   min-height: 1em;
   margin-top: 10px;
   font-size: 12px;
   color: var(--muted);
+  line-height: 1.45;
 }
 .wp-msg[data-kind="error"] { color: #fca5a5; }
 
