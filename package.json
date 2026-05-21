@@ -1,7 +1,7 @@
 {
   "name": "youtube-glass",
   "productName": "Glass",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Glassmorphic YouTube frontend (Piped backend) with built-in ad/tracker blocking",
   "author": "Sunblock-Code",
   "license": "MIT",
