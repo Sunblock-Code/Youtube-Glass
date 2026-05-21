@@ -5134,6 +5134,10 @@ body.dragging-panel * { cursor: grabbing !important; }
    children so they don't crowd the title above. */
 .auth-card .auth-text strong + span { margin-top: 2px; line-height: 1.45; }
 
+/* The form sits visually between the two action cards above and the
+   modal footer below. The input + button matched to ~62 px so the row
+   has the same vertical mass as the cards (icon + 2-line text, ~66 px),
+   keeping the modal's rhythm even. */
 .wp-join-form {
   display: flex;
   gap: 8px;
@@ -5143,16 +5147,16 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-join-form input {
   flex: 1 1 auto;
   min-width: 0;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: 12px;
+  height: 62px;
+  padding: 0 18px;
+  border-radius: 14px;
   border: 1px solid var(--glass-border);
   background: var(--glass);
   color: var(--text);
   font-family: "Segoe UI Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 6px;
   text-transform: uppercase;
   text-align: center;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
@@ -5160,8 +5164,8 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-join-form input::placeholder {
   color: var(--muted);
   font-weight: 500;
-  letter-spacing: 2px;
-  opacity: 0.55;
+  letter-spacing: 4px;
+  opacity: 0.45;
 }
 .wp-join-form input:focus {
   outline: none;
@@ -5169,12 +5173,44 @@ body.dragging-panel * { cursor: grabbing !important; }
   background: var(--glass-strong);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+/* Join button: rebuilt as a proper accent-gradient pill matching the rest
+   of the app's primary-button language. The previous look was the browser
+   default — white box, dark text — because `.modal-btn` doesn't ship with
+   a base style (the existing .modal-actions buttons get theirs from a
+   `.modal-actions button` selector that didn't apply here). */
 .wp-join-form .modal-btn {
-  height: 44px;
-  padding: 0 22px;
+  height: 62px;
+  padding: 0 26px;
   flex-shrink: 0;
   margin: 0;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s, filter 0.15s;
 }
+.wp-join-form .modal-btn:hover:not(:disabled) {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+}
+.wp-join-form .modal-btn.primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(192, 132, 252, 0.28);
+}
+.wp-join-form .modal-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: 0 8px 22px rgba(192, 132, 252, 0.40);
+}
+.wp-join-form .modal-btn:active:not(:disabled) { transform: scale(0.97); }
+.wp-join-form .modal-btn:disabled { opacity: 0.55; cursor: default; }
 .wp-msg {
   min-height: 1em;
   margin-top: 10px;
