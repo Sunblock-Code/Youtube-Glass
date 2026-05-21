@@ -1942,7 +1942,7 @@ async function renderVideo(id) {
 
   view.innerHTML = `
     <div class="player-page ${relatedCollapsed ? 'related-collapsed' : ''} ${commentsCollapsed ? 'comments-collapsed' : ''}">
-      <div class="comments-col">
+      <div class="comments-col" data-cside="comments">
         <div class="panel-tab-bar">
           <button class="panel-tab" data-pt-target="comments">Comments</button>
           <button class="panel-tab" data-pt-target="related">Up next</button>
@@ -1952,6 +1952,10 @@ async function renderVideo(id) {
           <button class="panel-collapse" title="Collapse panel" aria-label="Collapse">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
+        </div>
+        <div class="comments-tabs" role="tablist" aria-label="Comments / Chat">
+          <button class="comments-tab active" data-cside-target="comments" role="tab" aria-selected="true">Comments</button>
+          <button class="comments-tab" data-cside-target="chat" role="tab" aria-selected="false">Chat<span class="chat-tab-dot" id="chat-tab-dot" hidden></span></button>
         </div>
         <div class="comments-stickyhead">
           <div class="comments-header">
@@ -1982,6 +1986,25 @@ async function renderVideo(id) {
         </div>
         <div class="comments-list" id="comments-list">
           <div class="loader" style="padding:30px">Loading comments</div>
+        </div>
+        <div class="chat-panel" id="chat-panel">
+          <div class="chat-empty" id="chat-empty">
+            <svg class="chat-empty-icon" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+            <div class="chat-empty-title">No room yet</div>
+            <div class="chat-empty-sub">Start or join a watch-together room to chat with whoever's watching with you.</div>
+            <button class="modal-btn primary" id="chat-open-wp" type="button">Watch together</button>
+          </div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-composer" id="chat-composer">
+            <input type="text" id="chat-input" placeholder="Send a message…" autocomplete="off" maxlength="500" />
+            <button id="chat-send" type="button" aria-label="Send" title="Send (Enter)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="player-col">
@@ -2402,6 +2425,8 @@ async function renderVideo(id) {
 
   // --- Custom video controls (replace native) ---
   attachCustomControls(v, view, data);
+  // Wire up the Comments/Chat tab bar and chat panel for this page.
+  wireChatPanel();
 
   let lastResumeSave = 0;
   const pbFill = view.querySelector('#pb-fill');
@@ -5442,6 +5467,18 @@ watchParty.addEventListener('message', (e) => {
   const { data, from } = e.detail;
   if (!data || typeof data !== 'object') return;
 
+  // Chat messages — applied independently of the player state machine.
+  if (data.type === 'chat') {
+    addChatMessage({
+      id: data.id || chatRandomId(),
+      name: String(data.name || 'Guest').slice(0, 32),
+      text: String(data.text || '').slice(0, 500),
+      ts: typeof data.ts === 'number' ? data.ts : Date.now(),
+      own: false,
+    });
+    return;
+  }
+
   if (data.type === 'hello') {
     // A guest just joined. Send them our current state so they jump straight
     // to whatever we're watching, at the right time, paused/playing matching.
@@ -5687,3 +5724,155 @@ function showWatchPartyRoom() {
   };
 }
 
+
+// ============================================================
+// Watch-together chat panel
+// ============================================================
+// Companion to the watchParty sync. The comments column now has a Comments
+// / Chat tab bar (left side); the Chat tab shows an empty state when not
+// in a room and a real message list + composer when you are. Messages
+// pass through the same DataChannel relay the playback events use.
+
+const chatMessages = [];
+const MAX_CHAT_HISTORY = 200;
+
+function getOrCreateChatName() {
+  let name = localStorage.getItem('wp-name');
+  if (!name) {
+    name = 'Guest ' + (1000 + Math.floor(Math.random() * 9000));
+    localStorage.setItem('wp-name', name);
+  }
+  return name;
+}
+
+function chatRandomId() {
+  // Short non-cryptographic id — only used for dedupe / log keys.
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function chatFormatTime(ts) {
+  const d = new Date(ts);
+  return d.getHours() + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
+function appendChatToDom(container, msg) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (msg.own ? ' own' : '');
+  // Avoid duplicate `(you)` labels by keeping the "you" tag in the meta
+  // only for own messages. Escape everything that came from peers.
+  const youTag = msg.own ? ' <span class="chat-msg-you">(you)</span>' : '';
+  div.innerHTML = `
+    <div class="chat-msg-meta">
+      <span class="chat-msg-name">${escape(msg.name)}</span>${youTag}
+      <span class="chat-msg-time">${chatFormatTime(msg.ts)}</span>
+    </div>
+    <div class="chat-msg-text">${escape(msg.text)}</div>
+  `;
+  container.appendChild(div);
+}
+
+function addChatMessage(msg) {
+  chatMessages.push(msg);
+  while (chatMessages.length > MAX_CHAT_HISTORY) chatMessages.shift();
+  const container = document.querySelector('#chat-messages');
+  if (container) {
+    appendChatToDom(container, msg);
+    container.scrollTop = container.scrollHeight;
+    // Unread dot — only flash when the user isn't already looking at chat
+    // and the message isn't one we just sent ourselves.
+    const col = document.querySelector('.comments-col');
+    if (col && col.dataset.cside !== 'chat' && !msg.own) {
+      const dot = document.querySelector('#chat-tab-dot');
+      if (dot) dot.hidden = false;
+    }
+  }
+}
+
+function refreshChatVisibility() {
+  const empty = document.querySelector('#chat-empty');
+  const messages = document.querySelector('#chat-messages');
+  const composer = document.querySelector('#chat-composer');
+  if (!empty || !messages || !composer) return;
+  if (watchParty.inRoom) {
+    empty.hidden = true;
+    messages.hidden = false;
+    composer.hidden = false;
+  } else {
+    empty.hidden = false;
+    messages.hidden = true;
+    composer.hidden = true;
+  }
+}
+
+function wireChatPanel() {
+  // Idempotent — call from renderVideo whenever the page innerHTML is
+  // refreshed. The chatMessages array lives at module scope so history
+  // survives navigation across videos within the same room session.
+  const panel = view.querySelector('#chat-panel');
+  if (!panel) return;
+  const col = view.querySelector('.comments-col');
+  const tabs = view.querySelectorAll('.comments-tab');
+
+  // Tab switching (Comments / Chat)
+  tabs.forEach(btn => {
+    btn.onclick = () => {
+      const target = btn.dataset.csideTarget;
+      if (!col || col.dataset.cside === target) return;
+      col.dataset.cside = target;
+      tabs.forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      if (target === 'chat') {
+        const dot = view.querySelector('#chat-tab-dot');
+        if (dot) dot.hidden = true;
+        if (watchParty.inRoom) {
+          setTimeout(() => view.querySelector('#chat-input')?.focus(), 0);
+        }
+      }
+    };
+  });
+
+  refreshChatVisibility();
+
+  // Re-render existing history into the freshly-mounted DOM.
+  const messagesEl = view.querySelector('#chat-messages');
+  if (messagesEl) {
+    chatMessages.forEach(m => appendChatToDom(messagesEl, m));
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // Open watch-party modal from empty state's CTA.
+  const openBtn = view.querySelector('#chat-open-wp');
+  if (openBtn) openBtn.onclick = () => showWatchPartyMenu();
+
+  // Composer — send on Enter (Shift+Enter = newline-equivalent for plain
+  // input means nothing, so we just always send on Enter).
+  const input = view.querySelector('#chat-input');
+  const sendBtn = view.querySelector('#chat-send');
+  if (!input || !sendBtn) return;
+  const sendMessage = () => {
+    const text = input.value.trim();
+    if (!text || !watchParty.inRoom) return;
+    const msg = {
+      id: chatRandomId(),
+      name: getOrCreateChatName(),
+      text,
+      ts: Date.now(),
+    };
+    addChatMessage({ ...msg, own: true });
+    watchParty.broadcast({ type: 'chat', id: msg.id, name: msg.name, text: msg.text, ts: msg.ts });
+    input.value = '';
+  };
+  sendBtn.onclick = sendMessage;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+  });
+}
+
+// Module-level state listener so the chat panel's empty / active state
+// flips correctly even when the user enters / leaves a room from
+// somewhere other than a video page. Querying the DOM at fire time
+// means we don't have to manage subscription lifecycles per-render.
+watchParty.addEventListener('state', refreshChatVisibility);
