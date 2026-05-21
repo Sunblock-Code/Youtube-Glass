@@ -408,12 +408,13 @@ body {
 
 .back-btn {
   -webkit-app-region: no-drag;
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  /* No box at rest — just the chevron. The button still keeps its hit area
-     so it remains clickable; background only appears on hover. */
-  background: transparent;
-  border: 1px solid transparent;
+  /* Smaller (32 vs 36) + visible glass frame at rest so the arrows read as
+     proper buttons instead of floating chevrons. The pair takes 8 px less
+     horizontal real estate together and the surrounding nav reads tighter. */
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   color: var(--muted);
   cursor: pointer;
   display: inline-flex;
@@ -424,16 +425,23 @@ body {
   transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.18s, opacity 0.2s;
 }
 .back-btn:hover:not(:disabled) {
-  background: var(--glass);
-  border-color: var(--glass-border);
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
   color: var(--accent);
   transform: translateX(-2px);
 }
 .back-btn:active:not(:disabled) { transform: translateX(-2px) scale(0.94); }
 .back-btn:disabled {
-  opacity: 0.25;
+  opacity: 0.35;
   cursor: default;
+  /* Keep the frame visible even when disabled so the buttons don't seem to
+     disappear entirely — just look "off". */
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.06);
 }
+/* Forward arrow nudges the other direction on hover for a subtle pair feel. */
+#fwd-btn:hover:not(:disabled) { transform: translateX(2px); }
+#fwd-btn:active:not(:disabled) { transform: translateX(2px) scale(0.94); }
 
 .search-wrap {
   position: relative;
@@ -4283,7 +4291,16 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-size: 14px;
 }
 
-/* --- Account button (logged-in state) --- */
+/* --- Account button (logged-in state) ---
+   The button is flex/center-aligned so the green "logged-in" dot is a flex
+   item and gets perfectly centred against the name's optical centre, instead
+   of the old inline-block + vertical-align: middle that floated the dot a
+   pixel or two above the text on some fonts. */
+#account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 #account-btn.logged-in {
   color: var(--text);
   background: var(--glass);
@@ -4291,16 +4308,16 @@ body.dragging-panel * { cursor: grabbing !important; }
   letter-spacing: 0.5px;
   text-transform: none;
   font-size: 12px;
+  gap: 8px;
 }
 #account-btn.logged-in::before {
   content: '';
-  display: inline-block;
-  width: 6px; height: 6px;
+  display: block;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: #4ade80;
-  margin-right: 8px;
-  vertical-align: middle;
   box-shadow: 0 0 8px #4ade80;
+  flex-shrink: 0;
 }
 
 /* --- Modal --- */
