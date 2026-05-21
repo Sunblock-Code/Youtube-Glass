@@ -4217,7 +4217,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   }
 }
 
-/* Hold-R refresh ring — centred overlay that fills as the key is held. */
+/* Hold-R refresh ring — centred overlay that fills as the key is held.
+   The SVG and its container both need overflow:visible so the .rr-prog
+   drop-shadow glow can render fully around the circle. SVG roots are
+   overflow:hidden by default, which clips the glow to a hard square edge
+   ("box") and breaks the look. */
 .refresh-ring {
   position: fixed;
   inset: 0;
@@ -4232,12 +4236,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   transform: scale(0.82);
   transition: opacity 0.12s ease, transform 0.12s ease;
   z-index: 9999;
+  overflow: visible;
 }
 .refresh-ring.show { opacity: 1; transform: scale(1); }
 .refresh-ring > svg:first-child {
   position: absolute;
   width: 96px;
   height: 96px;
+  overflow: visible;        /* let the .rr-prog glow extend past the box */
 }
 .refresh-ring .rr-track {
   fill: rgba(10, 6, 18, 0.72);
@@ -4251,11 +4257,13 @@ body.dragging-panel * { cursor: grabbing !important; }
   stroke-linecap: round;
   transform: rotate(-90deg);          /* start the fill at 12 o'clock */
   transform-origin: 50% 50%;
-  filter: drop-shadow(0 0 5px var(--accent));
+  filter: drop-shadow(0 0 6px var(--accent))
+          drop-shadow(0 0 14px var(--accent-soft));
 }
 .refresh-ring.done .rr-prog {
   stroke: #4ade80;
-  filter: drop-shadow(0 0 8px #4ade80);
+  filter: drop-shadow(0 0 8px #4ade80)
+          drop-shadow(0 0 18px rgba(74, 222, 128, 0.55));
 }
 .refresh-ring .rr-glyph {
   width: 28px;
@@ -5049,4 +5057,114 @@ body.dragging-panel * { cursor: grabbing !important; }
   box-shadow:
     0 3px 10px rgba(192, 132, 252, 0.45),
     inset 0 2px 5px rgba(0, 0, 0, 0.18);
+}
+
+
+/* ============================================================
+   Watch together
+   ============================================================
+   Single topnav icon button + a small badge that appears only when the
+   user is in a room. The badge sits over the bottom-right corner of the
+   button so the icon area itself stays unchanged when not in use. Solo
+   users see a regular icon-btn and can ignore it entirely. */
+.wp-btn { position: relative; }
+.wp-btn.active {
+  color: var(--accent);
+  border-color: rgba(192, 132, 252, 0.40);
+  background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(236, 72, 153, 0.10));
+  box-shadow: 0 0 14px rgba(192, 132, 252, 0.25);
+}
+.wp-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #160a26;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--bg, #0a0612);
+  letter-spacing: 0;
+  line-height: 1;
+}
+.wp-badge[hidden] { display: none; }
+
+/* Modal content — start screen */
+.wp-join-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+.wp-join-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font-family: "Segoe UI Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 16px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.wp-join-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.wp-msg {
+  min-height: 1em;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wp-msg[data-kind="error"] { color: #fca5a5; }
+
+/* Modal content — in-room screen */
+.wp-code-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 14px 0;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+.wp-code-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.wp-code {
+  flex: 1;
+  font-family: "Segoe UI Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--text);
+  user-select: all;
+  text-align: center;
+}
+.wp-peers {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.wp-tip {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 4px;
 }

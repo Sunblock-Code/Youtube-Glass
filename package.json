@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "dashjs": "^4.7.4",
-    "hls.js": "^1.5.13"
+    "hls.js": "^1.5.13",
+    "peerjs": "^1.5.5"
   },
   "build": {
     "appId": "com.glass.youtube",

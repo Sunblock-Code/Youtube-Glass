@@ -7,6 +7,7 @@ import {
 } from './api.js';
 import * as playerLib from './player.js';
 const { play, destroy } = playerLib;
+import { watchParty, normalizeRoomCode, ROOM_CODE_LENGTH } from './watchparty.js';
 
 const view = document.getElementById('view');
 const search = document.getElementById('search');
@@ -634,6 +635,12 @@ async function go(route, ...args) {
   view.scrollTop = 0;
   view.innerHTML = `<div class="loader">Loading</div>`;
 
+  // Watch-together: if we're in a room and the user navigated to a video,
+  // tell everyone else so they follow. Skip when we ourselves are applying a
+  // remote nav — otherwise we'd echo it back as a fresh broadcast.
+  if (route === 'video' && watchParty.inRoom && !watchParty.applyingRemote) {
+    watchParty.broadcast({ type: 'video', id: args[0] });
+  }
   try {
     if (route === 'home')         await renderDashboard();
     else if (route === 'search')  await renderSearch(args[0]);
@@ -5374,3 +5381,309 @@ function maybePromptResumeLast() {
 }
 // Slight delay so the dashboard paints first; banner appears 600ms in.
 setTimeout(maybePromptResumeLast, 600);
+
+// ============================================================
+// Watch together (PeerJS-backed P2P sync)
+// ============================================================
+// The watchParty singleton from ./watchparty.js handles the network layer.
+// This block wires it to the existing UI: a topnav icon to open the room
+// dialog, capture-phase listeners on the main player so any local play /
+// pause / seek broadcasts to peers, and a tiny applier that mirrors inbound
+// events back to the local <video>.
+
+// Helper: apply an inbound event without echoing it back. The watchParty
+// broadcast() short-circuits when `applyingRemote` is true, so anything we
+// touch on the player during this window won't bounce back to peers.
+function wpApply(fn) {
+  watchParty.applyingRemote = true;
+  try { fn(); }
+  finally {
+    // Keep the flag set for a few hundred ms so the play/pause/seeked event
+    // that fires asynchronously after our action also gets suppressed.
+    setTimeout(() => { watchParty.applyingRemote = false; }, 250);
+  }
+}
+
+// The only <video> we want to mirror is the main player's — NOT the seek
+// preview thumb, NOT the various inline hover previews. Filter by location.
+function isMainPlayerVideo(el) {
+  return el && el.tagName === 'VIDEO' && el.closest('#player-wrap') !== null;
+}
+
+// Local player events → broadcast. Capture phase because the play/pause/
+// seeked events on <video> don't bubble.
+document.addEventListener('play', (e) => {
+  if (!watchParty.inRoom || watchParty.applyingRemote) return;
+  if (!isMainPlayerVideo(e.target)) return;
+  watchParty.broadcast({ type: 'play', t: e.target.currentTime });
+}, true);
+document.addEventListener('pause', (e) => {
+  if (!watchParty.inRoom || watchParty.applyingRemote) return;
+  if (!isMainPlayerVideo(e.target)) return;
+  watchParty.broadcast({ type: 'pause', t: e.target.currentTime });
+}, true);
+document.addEventListener('seeked', (e) => {
+  if (!watchParty.inRoom || watchParty.applyingRemote) return;
+  if (!isMainPlayerVideo(e.target)) return;
+  watchParty.broadcast({ type: 'seek', t: e.target.currentTime });
+}, true);
+
+// Periodic time sync from the HOST. Guests follow if they've drifted past
+// 0.75s — anything smaller and we'd thrash the sidecar audio drift loop.
+setInterval(() => {
+  if (!watchParty.inRoom || !watchParty.isHost) return;
+  const v = document.querySelector('#player-wrap video');
+  if (!v) return;
+  watchParty.broadcast({ type: 'tick', t: v.currentTime, paused: v.paused });
+}, 3000);
+
+// Inbound messages → mirror onto the local player.
+watchParty.addEventListener('message', (e) => {
+  const { data, from } = e.detail;
+  if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'hello') {
+    // A guest just joined. Send them our current state so they jump straight
+    // to whatever we're watching, at the right time, paused/playing matching.
+    const v = document.querySelector('#player-wrap video');
+    const conn = watchParty.connections.get(from);
+    if (conn) {
+      watchParty.send(conn, {
+        type: 'state',
+        videoId: currentVideoId || null,
+        t: v ? v.currentTime : 0,
+        paused: v ? v.paused : true,
+      });
+    }
+    return;
+  }
+
+  if (data.type === 'state') {
+    // Host's reply to our hello. Navigate to their video, then snap time.
+    if (data.videoId && data.videoId !== currentVideoId) {
+      wpApply(() => go('video', data.videoId));
+      // Wait for the video element to mount + start loading before snapping
+      // currentTime. 900ms is a balance: long enough for renderVideo to
+      // attach the element, short enough that the user doesn't sit on a
+      // wrong-time frame for noticeably long.
+      setTimeout(() => {
+        const v = document.querySelector('#player-wrap video');
+        if (!v) return;
+        wpApply(() => {
+          if (typeof data.t === 'number') v.currentTime = data.t;
+          if (data.paused) v.pause();
+          else v.play().catch(() => {});
+        });
+      }, 900);
+    } else if (data.videoId === currentVideoId) {
+      // Same video; just align time + paused state.
+      const v = document.querySelector('#player-wrap video');
+      if (v) wpApply(() => {
+        if (typeof data.t === 'number') v.currentTime = data.t;
+        if (data.paused) v.pause();
+        else v.play().catch(() => {});
+      });
+    }
+    return;
+  }
+
+  if (data.type === 'video') {
+    if (data.id && data.id !== currentVideoId) {
+      wpApply(() => go('video', data.id));
+    }
+    return;
+  }
+
+  // The rest assume we're already on the right video.
+  const v = document.querySelector('#player-wrap video');
+  if (!v) return;
+
+  if (data.type === 'play') {
+    wpApply(() => {
+      if (typeof data.t === 'number' && Math.abs(v.currentTime - data.t) > 0.5) {
+        v.currentTime = data.t;
+      }
+      v.play().catch(() => {});
+    });
+  } else if (data.type === 'pause') {
+    wpApply(() => {
+      v.pause();
+      if (typeof data.t === 'number' && Math.abs(v.currentTime - data.t) > 0.5) {
+        v.currentTime = data.t;
+      }
+    });
+  } else if (data.type === 'seek') {
+    if (typeof data.t === 'number') wpApply(() => { v.currentTime = data.t; });
+  } else if (data.type === 'tick') {
+    // Only snap if we've drifted noticeably AND we're not in the middle of
+    // an ongoing seek (which has its own settle time).
+    if (typeof data.t !== 'number' || v.seeking) return;
+    const drift = Math.abs(v.currentTime - data.t);
+    if (drift > 0.75) wpApply(() => { v.currentTime = data.t; });
+    // Track host's paused state too so a guest who unpaused locally gets
+    // re-paused by the host's next tick.
+    if (data.paused && !v.paused) wpApply(() => v.pause());
+    if (!data.paused && v.paused) wpApply(() => v.play().catch(() => {}));
+  }
+});
+
+// Reflect room state in the topnav button. Active class + a tiny count badge.
+watchParty.addEventListener('state', (e) => {
+  const { inRoom, roomCode, peerCount } = e.detail;
+  const btn = document.getElementById('wp-btn');
+  const badge = document.getElementById('wp-badge');
+  if (!btn) return;
+  if (inRoom) {
+    btn.classList.add('active');
+    btn.title = `Watch together — Room ${roomCode} (${peerCount} other${peerCount === 1 ? '' : 's'})`;
+    if (badge) { badge.textContent = String(peerCount + 1); badge.hidden = false; }
+  } else {
+    btn.classList.remove('active');
+    btn.title = 'Watch together';
+    if (badge) { badge.hidden = true; badge.textContent = ''; }
+  }
+  // If the room dialog is currently open, re-render it so it shows fresh
+  // peer count / state without the user needing to close-and-reopen.
+  if (!modal.classList.contains('hidden') && modalBody.querySelector('[data-wp-modal]')) {
+    showWatchPartyMenu();
+  }
+});
+
+watchParty.addEventListener('error', (e) => {
+  const m = e.detail?.message;
+  if (!m) return;
+  // Show in the existing install-banner area — same prominence as yt-dlp
+  // banners, easy to dismiss, doesn't trap focus the way a modal would.
+  showBanner(`<div class="banner-text"><strong>Watch together</strong><span>${escape(m)}</span></div>`, 'error');
+  setTimeout(clearBanner, 5000);
+});
+
+// Topnav button → open the dialog.
+const wpBtn = document.getElementById('wp-btn');
+if (wpBtn) wpBtn.onclick = showWatchPartyMenu;
+
+function showWatchPartyMenu() {
+  if (watchParty.inRoom) showWatchPartyRoom();
+  else showWatchPartyStart();
+}
+
+function showWatchPartyStart() {
+  openModal(`
+    <h2 data-wp-modal>Watch together</h2>
+    <div class="modal-sub">Sync video playback with friends. Start a room and share the code, or join with a code someone sent you.</div>
+    <div class="auth-options">
+      <button class="auth-card" id="wp-start" type="button">
+        <span class="auth-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+          </svg>
+        </span>
+        <div class="auth-text"><strong>Start a room</strong><span>You'll get a 6-character code to share with friends.</span></div>
+      </button>
+      <button class="auth-card" id="wp-join-toggle" type="button">
+        <span class="auth-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+        </span>
+        <div class="auth-text"><strong>Join a room</strong><span>Enter a code someone sent you.</span></div>
+      </button>
+    </div>
+    <div id="wp-join-form" class="wp-join-form" hidden>
+      <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="6-char code" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+      <button id="wp-join-go" class="modal-btn primary">Join</button>
+    </div>
+    <div id="wp-msg" class="hint wp-msg"></div>
+  `);
+
+  const msgEl = modalBody.querySelector('#wp-msg');
+  const setMsg = (text, kind = '') => {
+    msgEl.textContent = text || '';
+    msgEl.dataset.kind = kind;
+  };
+
+  modalBody.querySelector('#wp-start').onclick = async () => {
+    setMsg('Creating room…');
+    modalBody.querySelector('#wp-start').disabled = true;
+    modalBody.querySelector('#wp-join-toggle').disabled = true;
+    try {
+      await watchParty.create();
+      showWatchPartyRoom();
+    } catch (e) {
+      setMsg(e.message || 'Could not start a room.', 'error');
+      modalBody.querySelector('#wp-start').disabled = false;
+      modalBody.querySelector('#wp-join-toggle').disabled = false;
+    }
+  };
+
+  modalBody.querySelector('#wp-join-toggle').onclick = () => {
+    modalBody.querySelector('#wp-join-form').hidden = false;
+    setTimeout(() => modalBody.querySelector('#wp-code-input').focus(), 0);
+  };
+
+  const input = modalBody.querySelector('#wp-code-input');
+  input.addEventListener('input', () => {
+    const cleaned = normalizeRoomCode(input.value);
+    if (cleaned !== input.value) input.value = cleaned;
+  });
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      modalBody.querySelector('#wp-join-go').click();
+    }
+  });
+
+  modalBody.querySelector('#wp-join-go').onclick = async () => {
+    const code = normalizeRoomCode(input.value);
+    if (code.length !== ROOM_CODE_LENGTH) {
+      setMsg(`Code should be ${ROOM_CODE_LENGTH} characters.`, 'error');
+      return;
+    }
+    setMsg('Joining…');
+    modalBody.querySelector('#wp-join-go').disabled = true;
+    try {
+      await watchParty.join(code);
+      showWatchPartyRoom();
+    } catch (e) {
+      setMsg(e.message || 'Could not join that room.', 'error');
+      modalBody.querySelector('#wp-join-go').disabled = false;
+    }
+  };
+}
+
+function showWatchPartyRoom() {
+  const code = watchParty.roomCode;
+  const count = watchParty.peerCount;
+  const total = count + 1;
+  openModal(`
+    <h2 data-wp-modal>Watch together</h2>
+    <div class="modal-sub">${watchParty.isHost ? "You started this room." : "You joined a room."}</div>
+    <div class="wp-code-block">
+      <div class="wp-code-label">Room code</div>
+      <div class="wp-code">${escape(code)}</div>
+      <button class="modal-btn" id="wp-copy" type="button">Copy</button>
+    </div>
+    <div class="wp-peers">${total} ${total === 1 ? "person" : "people"} watching</div>
+    <div class="hint wp-tip">Play, pause, seek, or switch videos — everyone in the room follows along.</div>
+    <div class="modal-actions">
+      <button class="modal-btn" id="wp-close" type="button">Close</button>
+      <button class="modal-btn danger" id="wp-leave" type="button">Leave room</button>
+    </div>
+  `);
+
+  const copyBtn = modalBody.querySelector('#wp-copy');
+  copyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      const orig = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = orig; }, 1200);
+    } catch { /* clipboard may be unavailable */ }
+  };
+  modalBody.querySelector('#wp-close').onclick = closeModal;
+  modalBody.querySelector('#wp-leave').onclick = () => {
+    watchParty.leave();
+    closeModal();
+  };
+}
+
