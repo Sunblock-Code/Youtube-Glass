@@ -5605,3 +5605,88 @@ body.dragging-panel * { cursor: grabbing !important; }
   .resume-actions { width: 100%; }
   .resume-actions button { flex: 1; }
 }
+
+/* ============================================================
+   Watch together — name field + integrated join card
+   ============================================================
+   The modal now requires a display name before either flow (start /
+   join) can proceed. Name field sits at the top so it's visually above
+   both action cards AND above the code input below. The code + Join
+   controls live INSIDE the Join a room card (visually tied to it)
+   instead of sitting in a free-floating row below.
+
+   `.auth-card-static` is a non-clickable variant of `.auth-card` used
+   for the Join card — it inherits the same frame, but skips the
+   button-like hover lift / press scale that imply "click me". */
+.wp-name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 12px;
+}
+.wp-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+}
+/* Specificity-matched to .modal input[type="text"] so it isn't pinned
+   to the generic 38 px modal input height. */
+.modal .wp-name-input,
+.wp-name-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.18s;
+}
+.modal .wp-name-input::placeholder,
+.wp-name-input::placeholder {
+  color: var(--muted);
+  opacity: 0.55;
+}
+.modal .wp-name-input:focus,
+.wp-name-input:focus {
+  border-color: var(--accent);
+  background: var(--glass-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* "Pick a name first" attention shake — gentle, ~3 oscillations. */
+.wp-name-input.wp-shake {
+  animation: wpShake 0.3s ease-in-out;
+  border-color: #fca5a5;
+}
+@keyframes wpShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px); }
+  40%      { transform: translateX(5px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
+
+/* Static card variant: same frame, no button-press affordances. */
+.auth-card-static {
+  cursor: default;
+  display: block;            /* override the flex row that .auth-card sets */
+  padding: 14px 16px 16px;
+}
+.auth-card-static:hover { background: var(--glass); border-color: var(--glass-border); }
+.auth-card-static:active { transform: none; }
+.auth-card-static .auth-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+/* The join code + button row now sits flush inside the Join a room card. */
+.wp-join-card .wp-join-form {
+  margin-top: 0;
+}

@@ -5605,9 +5605,19 @@ function showWatchPartyMenu() {
 }
 
 function showWatchPartyStart() {
+  // Pre-fill the name field with any previously-saved display name so
+  // returning users don't have to retype. New users get an empty box with
+  // a helpful placeholder.
+  const savedName = localStorage.getItem('wp-name') || '';
   openModal(`
     <h2 data-wp-modal>Watch together</h2>
     <div class="modal-sub">Sync video playback with friends — share a code or join one.</div>
+
+    <div class="wp-name-row">
+      <label class="wp-field-label" for="wp-name">Your name</label>
+      <input type="text" id="wp-name" class="wp-name-input" maxlength="24" placeholder="What should others see?" autocomplete="off" spellcheck="false" value="${escapeAttr(savedName)}" />
+    </div>
+
     <div class="auth-options">
       <button class="auth-card" id="wp-start" type="button">
         <span class="auth-icon">
@@ -5617,19 +5627,23 @@ function showWatchPartyStart() {
         </span>
         <div class="auth-text"><strong>Start a room</strong><span>Get a 6-character code to share.</span></div>
       </button>
-      <button class="auth-card" id="wp-join-toggle" type="button">
-        <span class="auth-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-        </span>
-        <div class="auth-text"><strong>Join a room</strong><span>Enter a code someone sent you.</span></div>
-      </button>
+
+      <div class="auth-card auth-card-static wp-join-card">
+        <div class="auth-card-head">
+          <span class="auth-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+          </span>
+          <div class="auth-text"><strong>Join a room</strong><span>Enter a code someone sent you.</span></div>
+        </div>
+        <div class="wp-join-form">
+          <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
+          <button id="wp-join-go" class="modal-btn primary">Join</button>
+        </div>
+      </div>
     </div>
-    <div id="wp-join-form" class="wp-join-form" hidden>
-      <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
-      <button id="wp-join-go" class="modal-btn primary">Join</button>
-    </div>
+
     <div id="wp-msg" class="hint wp-msg"></div>
   `);
 
@@ -5639,31 +5653,50 @@ function showWatchPartyStart() {
     msgEl.dataset.kind = kind;
   };
 
+  const nameInput = modalBody.querySelector('#wp-name');
+  // Persist the name as the user types so it survives modal close/re-open and
+  // is what getOrCreateChatName() will return going forward.
+  nameInput.addEventListener('input', () => {
+    const v = nameInput.value.trim();
+    if (v) localStorage.setItem('wp-name', v);
+  });
+  // Block name characters that mangle things on the wire (control chars,
+  // newlines). Trimming is done at send time.
+  const cleanName = () => nameInput.value.trim().slice(0, 24);
+  const requireName = () => {
+    const v = cleanName();
+    if (!v) {
+      setMsg('Pick a name first — that\'s what others will see in chat.', 'error');
+      nameInput.focus();
+      nameInput.classList.add('wp-shake');
+      setTimeout(() => nameInput.classList.remove('wp-shake'), 320);
+      return null;
+    }
+    localStorage.setItem('wp-name', v);
+    return v;
+  };
+
   modalBody.querySelector('#wp-start').onclick = async () => {
+    if (!requireName()) return;
     setMsg('Creating room…');
     modalBody.querySelector('#wp-start').disabled = true;
-    modalBody.querySelector('#wp-join-toggle').disabled = true;
+    modalBody.querySelector('#wp-join-go').disabled = true;
     try {
       await watchParty.create();
       showWatchPartyRoom();
     } catch (e) {
       setMsg(e.message || 'Could not start a room.', 'error');
       modalBody.querySelector('#wp-start').disabled = false;
-      modalBody.querySelector('#wp-join-toggle').disabled = false;
+      modalBody.querySelector('#wp-join-go').disabled = false;
     }
   };
 
-  modalBody.querySelector('#wp-join-toggle').onclick = () => {
-    modalBody.querySelector('#wp-join-form').hidden = false;
-    setTimeout(() => modalBody.querySelector('#wp-code-input').focus(), 0);
-  };
-
-  const input = modalBody.querySelector('#wp-code-input');
-  input.addEventListener('input', () => {
-    const cleaned = normalizeRoomCode(input.value);
-    if (cleaned !== input.value) input.value = cleaned;
+  const codeInput = modalBody.querySelector('#wp-code-input');
+  codeInput.addEventListener('input', () => {
+    const cleaned = normalizeRoomCode(codeInput.value);
+    if (cleaned !== codeInput.value) codeInput.value = cleaned;
   });
-  input.addEventListener('keydown', (ev) => {
+  codeInput.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') {
       ev.preventDefault();
       modalBody.querySelector('#wp-join-go').click();
@@ -5671,9 +5704,11 @@ function showWatchPartyStart() {
   });
 
   modalBody.querySelector('#wp-join-go').onclick = async () => {
-    const code = normalizeRoomCode(input.value);
+    if (!requireName()) return;
+    const code = normalizeRoomCode(codeInput.value);
     if (code.length !== ROOM_CODE_LENGTH) {
       setMsg(`Code should be ${ROOM_CODE_LENGTH} characters.`, 'error');
+      codeInput.focus();
       return;
     }
     setMsg('Joining…');
@@ -5686,6 +5721,12 @@ function showWatchPartyStart() {
       modalBody.querySelector('#wp-join-go').disabled = false;
     }
   };
+
+  // If a saved name exists, jump straight to the code field; otherwise the
+  // name field is the right starting point.
+  setTimeout(() => {
+    (savedName ? codeInput : nameInput).focus();
+  }, 0);
 }
 
 function showWatchPartyRoom() {
