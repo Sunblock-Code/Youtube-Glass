@@ -5230,9 +5230,9 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-code-block {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 14px 16px;
-  margin: 14px 0;
+  margin: 14px 0 18px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
@@ -5255,16 +5255,54 @@ body.dragging-panel * { cursor: grabbing !important; }
   user-select: all;
   text-align: center;
 }
+/* Copy button inside the code block — accent gradient pill, matches modal-actions.primary aesthetic */
+.wp-code-block .modal-btn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, var(--accent, #c084fc), #ec4899);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .4px;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  box-shadow: 0 6px 16px rgba(192, 132, 252, .25);
+  transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.wp-code-block .modal-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(192, 132, 252, .35);
+}
+.wp-code-block .modal-btn:active { transform: scale(.97); }
+
 .wp-peers {
   font-size: 13px;
+  font-weight: 600;
   color: var(--text);
-  margin-bottom: 6px;
+  text-align: center;
+  margin: 2px 0 10px;
+  letter-spacing: .2px;
 }
+/* Description card — centered, lifted off the background a touch */
 .wp-tip {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 4px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  opacity: .85;
+  text-align: center;
+  padding: 12px 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  margin: 0;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ============================================================
@@ -5494,3 +5532,76 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .chat-composer button:hover:not(:disabled) { filter: brightness(1.07); }
 .chat-composer button:active:not(:disabled) { transform: scale(0.95); }
+
+/* ============================================================
+   Responsive: stop the dashboard / banners from clipping
+   ============================================================
+   At narrow viewport widths the resume banner's Dismiss button, the
+   "Edit dashboard" button, and the Recently watched widget's "See all"
+   link all got pushed past the right edge. Three layered fixes:
+
+   - Stack dashboard widgets earlier (was 720 px → now 1000 px) so the
+     two-column grid doesn't squeeze the Recently watched widget off
+     the page.
+   - Resume banner wraps its actions to a second row instead of letting
+     them overflow.
+   - .dash-page-header (the "Your dashboard" + Edit button row) wraps
+     the button below the heading instead of clipping it.
+   - main / #banner horizontal padding shrinks at narrow widths to give
+     content more room. */
+
+.dash-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.dash-page-header > h2 {
+  /* If wrap kicks in, the heading should still take the full row above
+     the button instead of leaving a tiny strip beside it. */
+  min-width: 200px;
+}
+
+@media (max-width: 1000px) {
+  main { padding: 20px 20px 32px; }
+  #banner { padding: 12px 20px 0; }
+  /* Force dashboard widgets to stack — was triggered only below 720 px,
+     which is well past the point where the row was already breaking. */
+  .dash-widget,
+  .dash-widget[data-widget="recentHistory"] {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  main { padding: 16px 14px 28px; }
+  #banner { padding: 10px 14px 0; }
+  /* Resume banner: thumb + info stay on row 1, actions drop to row 2 so
+     the Dismiss button is never pushed off the right edge. */
+  .resume-last-banner {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .resume-thumb-wrap { width: 110px; }
+  .resume-info { flex: 1 1 calc(100% - 122px); }
+  .resume-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  .resume-actions button {
+    height: 36px;
+    padding: 0 16px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 440px) {
+  /* Tiniest layout: everything in resume banner stacks; the thumb still
+     shows but the buttons go full-width below for easy tapping. */
+  .resume-last-banner { flex-direction: column; align-items: stretch; }
+  .resume-thumb-wrap { width: 100%; max-width: 320px; }
+  .resume-actions { width: 100%; }
+  .resume-actions button { flex: 1; }
+}

@@ -1041,7 +1041,7 @@ async function renderHomeDashboard() {
   }
 
   view.innerHTML = homeModeBar('dashboard') + `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+    <div class="dash-page-header">
       <h2 class="section-title" style="margin:0;flex:1">Your dashboard</h2>
       <button id="dash-edit" class="topnav-style-btn ${dashboardEditing ? 'primary' : ''}">${dashboardEditing ? 'Done' : 'Edit dashboard'}</button>
     </div>
