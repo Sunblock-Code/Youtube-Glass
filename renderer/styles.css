@@ -5144,7 +5144,13 @@ body.dragging-panel * { cursor: grabbing !important; }
   margin-top: 12px;
   align-items: stretch;
 }
-.wp-join-form input {
+/* .modal selector added on purpose: the generic `.modal input[type="text"]`
+   rule earlier in this file pins inputs to 38 px tall with 0,2,1 specificity,
+   which beat the previous `.wp-join-form input` (0,1,1) and made the code
+   field render visibly shorter than the matching Join button. Lifting our
+   selector to `.modal .wp-join-form input` matches that specificity, and
+   source order does the rest. */
+.modal .wp-join-form input {
   flex: 1 1 auto;
   min-width: 0;
   height: 62px;
@@ -5161,13 +5167,13 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-align: center;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
-.wp-join-form input::placeholder {
+.modal .wp-join-form input::placeholder {
   color: var(--muted);
   font-weight: 500;
   letter-spacing: 4px;
   opacity: 0.45;
 }
-.wp-join-form input:focus {
+.modal .wp-join-form input:focus {
   outline: none;
   border-color: var(--accent);
   background: var(--glass-strong);
