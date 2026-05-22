@@ -5740,7 +5740,7 @@ function showWatchPartyStart() {
 
   modalBody.querySelector('#wp-start').onclick = async () => {
     if (!requireName()) return;
-    setMsg('Creating room…');
+    setMsg('Creating room…', 'loading');
     modalBody.querySelector('#wp-start').disabled = true;
     modalBody.querySelector('#wp-join-go').disabled = true;
     try {
@@ -5773,7 +5773,7 @@ function showWatchPartyStart() {
       codeInput.focus();
       return;
     }
-    setMsg('Joining…');
+    setMsg('Joining…', 'loading');
     modalBody.querySelector('#wp-join-go').disabled = true;
     try {
       await watchParty.join(code);

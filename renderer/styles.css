@@ -5221,6 +5221,9 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .wp-join-form .modal-btn:active:not(:disabled) { transform: scale(0.97); }
 .wp-join-form .modal-btn:disabled { opacity: 0.55; cursor: default; }
+/* Default state: a quiet single-line strip below the join card. Once a
+   real message lands (loading / error), the strip lifts into a proper
+   pill so the user can actually tell something is happening. */
 .wp-msg {
   min-height: 1em;
   margin-top: 10px;
@@ -5228,7 +5231,74 @@ body.dragging-panel * { cursor: grabbing !important; }
   color: var(--muted);
   line-height: 1.45;
 }
-.wp-msg[data-kind="error"] { color: #fca5a5; }
+
+/* Loading state — soft accent pill with a small inline spinner. Used
+   while we're creating a room or joining one, so "Joining…" reads as a
+   live progress indicator instead of muted footer text. */
+.wp-msg[data-kind="loading"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(192, 132, 252, 0.10);
+  border: 1px solid rgba(192, 132, 252, 0.28);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.08);
+  animation: wpMsgIn 0.18s ease-out;
+}
+.wp-msg[data-kind="loading"]::before {
+  content: '';
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: wpMsgSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Error state — soft red pill with a "!" mark so it's clearly an error
+   without being aggressive. */
+.wp-msg[data-kind="error"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(244, 114, 182, 0.10);
+  border: 1px solid rgba(244, 114, 182, 0.30);
+  border-radius: 10px;
+  color: #fecdd3;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  animation: wpMsgIn 0.18s ease-out;
+}
+.wp-msg[data-kind="error"]::before {
+  content: '!';
+  width: 16px; height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(244, 114, 182, 0.55);
+  color: #1a0712;
+  font-weight: 800;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+@keyframes wpMsgIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes wpMsgSpin {
+  to { transform: rotate(360deg); }
+}
 
 /* Modal content — in-room screen */
 .wp-code-block {
