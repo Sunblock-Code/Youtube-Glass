@@ -4920,19 +4920,23 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 
 /* --- Pretty resume-last banner --- */
+/* Match the dashboard widget / topnav button language: plain glass tint
+   + faint border, no purple/pink wash. Keeps the resume banner visually
+   in the same family as the rest of the home screen instead of reading
+   as a standout coloured strip above it. The "PICK UP WHERE YOU LEFT OFF"
+   label and the Continue gradient still carry the accent so the banner's
+   meant-to-be-noticed parts pop without the whole frame doing it. */
 .resume-last-banner {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 14px 16px;
-  background:
-    linear-gradient(135deg, rgba(192, 132, 252, 0.10), rgba(236, 72, 153, 0.06)),
-    rgba(20, 12, 30, 0.55);
-  border: 1px solid rgba(192, 132, 252, 0.28);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
-  backdrop-filter: blur(28px) saturate(140%);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
 }
 .resume-thumb-wrap {
   position: relative;
