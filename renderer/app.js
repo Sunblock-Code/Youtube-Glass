@@ -5817,14 +5817,33 @@ function showWatchPartyRoom() {
         <div class="wp-peers-label">${total === 1 ? 'PERSON' : 'PEOPLE'} WATCHING</div>
       </div>
       <div class="wp-info-card wp-tip-card">
-        <span class="wp-info-icon wp-tip-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"/>
-            <polyline points="1 20 1 14 7 14"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-          </svg>
-        </span>
-        <div class="wp-tip-text">Play, pause, seek, or switch videos — everyone follows along.</div>
+        <div class="wp-tip-grid">
+          <div class="wp-action wp-action-play" aria-label="Play">
+            <svg class="wp-action-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <polygon points="6 4 20 12 6 20"/>
+            </svg>
+            <span>Play</span>
+          </div>
+          <div class="wp-action wp-action-pause" aria-label="Pause">
+            <svg class="wp-action-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span>Pause</span>
+          </div>
+          <div class="wp-action wp-action-seek" aria-label="Seek">
+            <svg class="wp-action-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <polygon points="13 19 22 12 13 5 13 19"/><polygon points="2 19 11 12 2 5 2 19"/>
+            </svg>
+            <span>Seek</span>
+          </div>
+          <div class="wp-action wp-action-switch" aria-label="Switch video">
+            <svg class="wp-action-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <polygon points="5 4 15 12 5 20 5 4"/><rect x="17" y="4" width="2" height="16"/>
+            </svg>
+            <span>Switch</span>
+          </div>
+        </div>
+        <div class="wp-tip-text">Everyone follows along.</div>
       </div>
     </div>
     <div class="modal-actions">

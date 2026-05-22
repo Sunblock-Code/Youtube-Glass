@@ -5361,7 +5361,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px;
+  padding: 10px 10px 10px 16px;
   margin: 14px 0 18px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
@@ -5391,9 +5391,14 @@ body.dragging-panel * { cursor: grabbing !important; }
    `border: 1px solid rgba(255,255,255,.18)` left a visibly-stripey edge
    on top of the gradient; swapped to an inset-shadow "rim" which gives
    the same soft outline without the antialiasing artefacts. */
+/* Copy button: locked width + centred content. Drop shadow trimmed to
+   a small inset only — the previous outer accent glow extended past
+   the code-block container as a visible halo, making the button look
+   like it was poking out the right side. Now the button sits cleanly
+   inside the container. */
 .wp-code-block .modal-btn {
   flex-shrink: 0;
-  min-width: 92px;             /* fits "Copied!" with breathing room */
+  min-width: 88px;             /* fits "Copied!" with breathing room */
   height: 40px;
   padding: 0 18px;
   border-radius: 10px;
@@ -5405,21 +5410,21 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-size: 13px;
   letter-spacing: .4px;
   cursor: pointer;
+  text-align: center;
   text-shadow: 0 1px 2px rgba(0, 0, 0, .25);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 6px 16px rgba(192, 132, 252, .25);
-  transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: filter .15s ease, transform .1s ease, box-shadow .15s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .wp-code-block .modal-btn:hover {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
+  filter: brightness(1.10);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 10px 22px rgba(192, 132, 252, .35);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 .wp-code-block .modal-btn:active { transform: scale(.97); }
 
@@ -5445,12 +5450,15 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-align: center;
 }
 /* Peer card stacks vertically: icon + count on top (centred row), label
-   centred below. Reads as a single visual unit with a strong number as
-   the focal point. */
+   centred below. Larger / brighter typography than the previous pass so
+   "PEOPLE WATCHING" actually reads — was undersized + muted. The icon
+   sits in the top row so it lines up vertically with the top row of
+   action icons in the sibling tip card. */
 .wp-peers-card {
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 14px 14px 12px;
+  justify-content: center;
 }
 .wp-peers-top {
   display: flex;
@@ -5467,44 +5475,80 @@ body.dragging-panel * { cursor: grabbing !important; }
   filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
 }
 .wp-peers-count {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .wp-peers-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.4px;
-  color: var(--muted);
+  color: #d4cfea;        /* brighter than --muted so the label reads */
   font-weight: 700;
   white-space: nowrap;
+  text-align: center;
 }
 
-/* Tip card mirrors the peer card structure: icon on top, descriptive
-   text below. More-readable text — full text colour at 0.92 opacity,
-   13 px font, generous 1.55 line-height — instead of the previous
-   muted 12 px squeeze. */
+/* Tip card: 2×2 colour-coded action grid on top (Play / Pause / Seek /
+   Switch), with the "everyone follows along" tagline on a single line
+   underneath. Each action pill is colour-coded so the user can see at
+   a glance what's being sync'd. */
 .wp-tip-card {
   flex-direction: column;
   gap: 8px;
-  padding: 14px 14px 12px;
+  padding: 12px 12px 10px;
+  align-items: stretch;
 }
-.wp-tip-icon {
-  color: var(--accent);
+.wp-tip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.wp-action {
   display: inline-flex;
   align-items: center;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+.wp-action-icon { flex-shrink: 0; }
+.wp-action-play {
+  background: rgba(74, 222, 128, 0.10);
+  border-color: rgba(74, 222, 128, 0.30);
+  color: #86efac;
+}
+.wp-action-pause {
+  background: rgba(251, 191, 36, 0.10);
+  border-color: rgba(251, 191, 36, 0.30);
+  color: #fcd34d;
+}
+.wp-action-seek {
+  background: rgba(96, 165, 250, 0.10);
+  border-color: rgba(96, 165, 250, 0.30);
+  color: #93c5fd;
+}
+.wp-action-switch {
+  background: rgba(192, 132, 252, 0.12);
+  border-color: rgba(192, 132, 252, 0.32);
+  color: #d8b4fe;
 }
 .wp-tip-text {
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.3;
   color: var(--text);
-  opacity: 0.92;
+  opacity: 0.75;
   font-weight: 500;
   text-align: center;
+  margin-top: 2px;
 }
 
 /* On very narrow modals the two cards stack to single column so the tip's
