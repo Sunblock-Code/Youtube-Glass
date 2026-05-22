@@ -5805,20 +5805,29 @@ function showWatchPartyRoom() {
     </div>
     <div class="wp-info-row">
       <div class="wp-info-card wp-peers-card" aria-label="${total} ${total === 1 ? 'person' : 'people'} watching">
-        <span class="wp-info-icon" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        <div class="wp-peers-top">
+          <span class="wp-info-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </span>
+          <strong class="wp-peers-count">${total}</strong>
+        </div>
+        <div class="wp-peers-label">${total === 1 ? 'PERSON' : 'PEOPLE'} WATCHING</div>
+      </div>
+      <div class="wp-info-card wp-tip-card">
+        <span class="wp-info-icon wp-tip-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
         </span>
-        <div class="wp-info-text">
-          <strong>${total}</strong>
-          <span>${total === 1 ? 'person' : 'people'} watching</span>
-        </div>
+        <div class="wp-tip-text">Play, pause, seek, or switch videos — everyone follows along.</div>
       </div>
-      <div class="wp-info-card wp-tip-card">Play, pause, seek, or switch videos — everyone in the room follows along.</div>
     </div>
     <div class="modal-actions">
       <button class="modal-btn" id="wp-close" type="button">Close</button>

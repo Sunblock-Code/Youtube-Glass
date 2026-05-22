@@ -5330,12 +5330,18 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-align: center;
 }
 /* Copy button inside the code block — accent gradient pill, matches modal-actions.primary aesthetic */
+/* Copy button — fixed width so toggling between "Copy" and "Copied!"
+   doesn't grow the button and push the code text around. The previous
+   `border: 1px solid rgba(255,255,255,.18)` left a visibly-stripey edge
+   on top of the gradient; swapped to an inset-shadow "rim" which gives
+   the same soft outline without the antialiasing artefacts. */
 .wp-code-block .modal-btn {
   flex-shrink: 0;
-  padding: 10px 20px;
-  min-height: 40px;
+  min-width: 92px;             /* fits "Copied!" with breathing room */
+  height: 40px;
+  padding: 0 18px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: none;
   background: linear-gradient(135deg, var(--accent, #c084fc), #ec4899);
   color: #fff;
   font: inherit;
@@ -5343,14 +5349,21 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-size: 13px;
   letter-spacing: .4px;
   cursor: pointer;
-  text-shadow: 0 1px 2px rgba(0,0,0,.25);
-  box-shadow: 0 6px 16px rgba(192, 132, 252, .25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 6px 16px rgba(192, 132, 252, .25);
   transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .wp-code-block .modal-btn:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(192, 132, 252, .35);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 10px 22px rgba(192, 132, 252, .35);
 }
 .wp-code-block .modal-btn:active { transform: scale(.97); }
 
@@ -5375,8 +5388,20 @@ body.dragging-panel * { cursor: grabbing !important; }
   justify-content: center;
   text-align: center;
 }
+/* Peer card stacks vertically: icon + count on top (centred row), label
+   centred below. Reads as a single visual unit with a strong number as
+   the focal point. */
 .wp-peers-card {
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 14px 12px;
+}
+.wp-peers-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  line-height: 1;
 }
 .wp-peers-card .wp-info-icon {
   color: var(--accent);
@@ -5385,32 +5410,45 @@ body.dragging-panel * { cursor: grabbing !important; }
   flex-shrink: 0;
   filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
 }
-.wp-peers-card .wp-info-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.1;
-  gap: 2px;
-}
-.wp-peers-card .wp-info-text strong {
-  font-size: 20px;
-  font-weight: 700;
+.wp-peers-count {
+  font-size: 24px;
+  font-weight: 800;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
-.wp-peers-card .wp-info-text span {
+.wp-peers-label {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.4px;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
+
+/* Tip card mirrors the peer card structure: icon on top, descriptive
+   text below. More-readable text — full text colour at 0.92 opacity,
+   13 px font, generous 1.55 line-height — instead of the previous
+   muted 12 px squeeze. */
 .wp-tip-card {
-  font-size: 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 12px;
+}
+.wp-tip-icon {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
+}
+.wp-tip-text {
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--text);
-  opacity: 0.85;
+  opacity: 0.92;
+  font-weight: 500;
+  text-align: center;
 }
 
 /* On very narrow modals the two cards stack to single column so the tip's
