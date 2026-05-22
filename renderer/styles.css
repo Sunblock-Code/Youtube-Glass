@@ -5497,8 +5497,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
 }
+.comments-tab-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.comments-tab.active .comments-tab-icon { opacity: 1; }
 .comments-tab:hover { color: var(--text); background: var(--glass); }
 .comments-tab.active {
   color: var(--text);
@@ -5639,14 +5645,18 @@ body.dragging-panel * { cursor: grabbing !important; }
   white-space: pre-wrap;
 }
 
-/* Composer at the bottom — single-line input + send icon button. */
+/* Composer at the TOP of the chat panel — sits directly under the
+   Comments / Chat tabs so the input is the first thing the user sees
+   when they switch to Chat. Messages flow below it. The visual border
+   is on the bottom now (was on top when composer was at the bottom) to
+   separate the composer strip from the message list. */
 .chat-composer {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 4px 4px;
-  border-top: 1px solid var(--glass-border);
-  margin-top: auto;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
 }
 .chat-composer[hidden] { display: none; }
 .chat-composer input {

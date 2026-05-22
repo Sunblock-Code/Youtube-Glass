@@ -1943,26 +1943,24 @@ async function renderVideo(id) {
   view.innerHTML = `
     <div class="player-page ${relatedCollapsed ? 'related-collapsed' : ''} ${commentsCollapsed ? 'comments-collapsed' : ''}">
       <div class="comments-col" data-cside="comments">
-        <div class="panel-tab-bar">
-          <button class="panel-tab" data-pt-target="comments">Comments</button>
-          <button class="panel-tab" data-pt-target="related">Up next</button>
-          <button class="panel-tab-split" title="Split panels">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="8" height="12" rx="1.5"/><rect x="13" y="6" width="8" height="12" rx="1.5"/></svg>
-          </button>
-          <button class="panel-collapse" title="Collapse panel" aria-label="Collapse">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
         <div class="comments-tabs" role="tablist" aria-label="Comments / Chat">
-          <button class="comments-tab active" data-cside-target="comments" role="tab" aria-selected="true">Comments</button>
-          <button class="comments-tab" data-cside-target="chat" role="tab" aria-selected="false">Chat<span class="chat-tab-dot" id="chat-tab-dot" hidden></span></button>
+          <button class="comments-tab active" data-cside-target="comments" role="tab" aria-selected="true">
+            <svg class="comments-tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Comments</span>
+          </button>
+          <button class="comments-tab" data-cside-target="chat" role="tab" aria-selected="false">
+            <svg class="comments-tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+            <span>Chat</span>
+            <span class="chat-tab-dot" id="chat-tab-dot" hidden></span>
+          </button>
         </div>
         <div class="comments-stickyhead">
           <div class="comments-header">
             <h2 class="section-title">Comments</h2>
-            <button class="related-toggle" id="comments-merge" title="Merge with Up next" aria-label="Merge">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="15" y="6" width="6" height="12" rx="1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-            </button>
             <button class="related-toggle" id="comments-toggle" title="${commentsCollapsed ? 'Show comments' : 'Hide comments'}" aria-label="Toggle comments">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"/>
@@ -1996,7 +1994,6 @@ async function renderVideo(id) {
             <div class="chat-empty-sub">Start or join a watch-together room to chat with whoever's watching with you.</div>
             <button class="modal-btn primary" id="chat-open-wp" type="button">Watch together</button>
           </div>
-          <div class="chat-messages" id="chat-messages"></div>
           <div class="chat-composer" id="chat-composer">
             <input type="text" id="chat-input" placeholder="Send a message…" autocomplete="off" maxlength="500" />
             <button id="chat-send" type="button" aria-label="Send" title="Send (Enter)">
@@ -2005,6 +2002,7 @@ async function renderVideo(id) {
               </svg>
             </button>
           </div>
+          <div class="chat-messages" id="chat-messages"></div>
         </div>
       </div>
       <div class="player-col">
@@ -2133,16 +2131,6 @@ async function renderVideo(id) {
         </div>
       </div>
       <div class="related-col">
-        <div class="panel-tab-bar">
-          <button class="panel-tab" data-pt-target="comments">Comments</button>
-          <button class="panel-tab" data-pt-target="related">Up next</button>
-          <button class="panel-tab-split" title="Split panels">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="8" height="12" rx="1.5"/><rect x="13" y="6" width="8" height="12" rx="1.5"/></svg>
-          </button>
-          <button class="panel-collapse" title="Collapse panel" aria-label="Collapse">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
         <div class="related-tabs" role="tablist" aria-label="Sidebar source">
           <button class="related-tab ${relatedSource === 'related' ? 'active' : ''}" data-rt="related" role="tab">Up next</button>
           <button class="related-tab ${relatedSource === 'subs' ? 'active' : ''}" data-rt="subs" role="tab">Subs</button>
@@ -2150,9 +2138,6 @@ async function renderVideo(id) {
         </div>
         <div class="related-header">
           <h2 class="section-title" id="related-active-label">${relatedSource === 'subs' ? 'Subs' : (relatedSource === 'history' ? 'History' : 'Up next')}</h2>
-          <button id="related-merge" title="Merge with Comments (drag or click)" aria-label="Merge">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="15" y="6" width="6" height="12" rx="1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-          </button>
           <button class="related-toggle" id="related-layout" title="Layout: ${relatedMode}" aria-label="Cycle layout">
             ${relatedLayoutIcon(relatedMode)}
           </button>
