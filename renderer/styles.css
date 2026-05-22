@@ -5280,29 +5280,70 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .wp-code-block .modal-btn:active { transform: scale(.97); }
 
-.wp-peers {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: center;
-  margin: 2px 0 10px;
-  letter-spacing: .2px;
+/* In-room info row: the peer-count card on the left, the play-pause tip
+   on the right. Equal-width flex children with centred content so both
+   read as a balanced pair instead of two stacked rows. */
+.wp-info-row {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 14px;
+  align-items: stretch;
 }
-/* Description card — centered, lifted off the background a touch */
-.wp-tip {
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--text);
-  opacity: .85;
-  text-align: center;
-  padding: 12px 18px;
+.wp-info-card {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 14px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  margin: 0;
-  max-width: 360px;
-  margin-left: auto;
-  margin-right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.wp-peers-card {
+  gap: 12px;
+}
+.wp-peers-card .wp-info-icon {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
+}
+.wp-peers-card .wp-info-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+  gap: 2px;
+}
+.wp-peers-card .wp-info-text strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.wp-peers-card .wp-info-text span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wp-tip-card {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  opacity: 0.85;
+}
+
+/* On very narrow modals the two cards stack to single column so the tip's
+   long text isn't squeezed into an unreadable column. */
+@media (max-width: 480px) {
+  .wp-info-row { flex-direction: column; }
+  .wp-info-card { padding: 14px 16px; }
 }
 
 /* ============================================================

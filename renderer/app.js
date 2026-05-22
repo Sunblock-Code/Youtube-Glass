@@ -5803,8 +5803,23 @@ function showWatchPartyRoom() {
       <div class="wp-code">${escape(code)}</div>
       <button class="modal-btn" id="wp-copy" type="button">Copy</button>
     </div>
-    <div class="wp-peers">${total} ${total === 1 ? "person" : "people"} watching</div>
-    <div class="hint wp-tip">Play, pause, seek, or switch videos — everyone in the room follows along.</div>
+    <div class="wp-info-row">
+      <div class="wp-info-card wp-peers-card" aria-label="${total} ${total === 1 ? 'person' : 'people'} watching">
+        <span class="wp-info-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+        <div class="wp-info-text">
+          <strong>${total}</strong>
+          <span>${total === 1 ? 'person' : 'people'} watching</span>
+        </div>
+      </div>
+      <div class="wp-info-card wp-tip-card">Play, pause, seek, or switch videos — everyone in the room follows along.</div>
+    </div>
     <div class="modal-actions">
       <button class="modal-btn" id="wp-close" type="button">Close</button>
       <button class="modal-btn danger" id="wp-leave" type="button">Leave room</button>
