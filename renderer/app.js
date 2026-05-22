@@ -389,11 +389,25 @@ function applySettings(s) {
   // the window opaque (Gradient/Solid) or transparent (Clear, no material).
   // Real OS material per mode: Acrylic→acrylic, Mica→mica, Gaussian→the
   // Win11 'tabbed' material, Clear→none (sharp), everything else→none.
+  // Acrylic is the only Windows material that actually renders see-through
+  // on the transparent window this machine needs (Mica/Tabbed paint nothing
+  // here). So Mica & Gaussian RENDER via the acrylic material too — they're
+  // differentiated by their own default tint/veil (below), not by a separate
+  // OS material that wouldn't show up. Clear = no material (sharp). This is
+  // what makes Mica & Gaussian actually work.
   const osMaterial =
-    s.bgMode === 'acrylic'  ? 'acrylic' :
-    s.bgMode === 'mica'     ? 'mica'    :
-    s.bgMode === 'gaussian' ? 'tabbed'  : 'none';
+    (s.bgMode === 'acrylic' || s.bgMode === 'mica' || s.bgMode === 'gaussian') ? 'acrylic' :
+    'none';
   if (window.app?.setWindowMaterial) window.app.setWindowMaterial(osMaterial);
+  // Distinct DEFAULT look per see-through preset (all use the acrylic engine
+  // but feel different out of the box): Acrylic = clean frost, Mica = a
+  // subtle solid-ish tint, Gaussian = a medium frost. Applied as a baseline
+  // floor on the background-dim veil so the user's slider can still go higher.
+  {
+    const baseVeil = { mica: 0.40, gaussian: 0.20 }[s.bgMode] || 0;
+    const slider = (typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0) / 100;
+    root.style.setProperty('--clear-bg-tint', Math.min(0.85, Math.max(baseVeil, slider)).toFixed(3));
+  }
   root.style.setProperty('--blur',        s.blur + 'px');
   root.style.setProperty('--glass-alpha', (s.glassAlpha / 100).toFixed(3));
   root.style.setProperty('--glass-strong-alpha', Math.min(0.30, (s.glassAlpha / 100) + 0.04).toFixed(3));
@@ -5850,7 +5864,7 @@ function showWatchPartyRoom() {
       <button class="modal-btn" id="wp-close" type="button">Close</button>
       <button class="modal-btn danger" id="wp-leave" type="button">Leave room</button>
     </div>
-  `);
+  `, { wide: true });
 
   const copyBtn = modalBody.querySelector('#wp-copy');
   copyBtn.onclick = async () => {

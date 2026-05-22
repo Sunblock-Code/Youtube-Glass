@@ -2082,8 +2082,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   gap: 4px;
   margin-bottom: 20px;
   padding: 4px;
-  background: rgba(18, 12, 28, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* Use the shared glass surface vars (like cards / video-title shapes)
+     instead of a hardcoded translucent purple — so it matches the rest of
+     the UI and goes fully OPAQUE in see-through modes (where --glass is
+     overridden to solid dark) instead of leaking a purple tint. */
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   width: fit-content;
 }
@@ -2233,7 +2237,7 @@ input[type="checkbox"].glass-check:checked::after {
 }
 
 /* Wider modal for picker so long channel names don't trigger horizontal scroll */
-.modal-card.wide { width: 520px; }
+.modal-card.wide { width: 560px; max-width: calc(100vw - 40px); }
 
 /* --- Settings modal: wide, sectioned grid, fits viewport --- */
 .modal-card.settings {
