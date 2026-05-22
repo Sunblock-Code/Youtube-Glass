@@ -5419,14 +5419,70 @@ setTimeout(maybePromptResumeLast, 600);
 // Helper: apply an inbound event without echoing it back. The watchParty
 // broadcast() short-circuits when `applyingRemote` is true, so anything we
 // touch on the player during this window won't bounce back to peers.
-function wpApply(fn) {
+//
+// Counter-based so overlapping calls (e.g. an inner snap inside an outer
+// navigation hold) keep the flag set until ALL pending timers expire,
+// instead of the older single-timeout approach where the first decrement
+// would flip the flag back to false mid-apply.
+let wpApplyDepth = 0;
+function wpApply(fn, holdMs = 350) {
+  wpApplyDepth++;
   watchParty.applyingRemote = true;
-  try { fn(); }
-  finally {
-    // Keep the flag set for a few hundred ms so the play/pause/seeked event
-    // that fires asynchronously after our action also gets suppressed.
-    setTimeout(() => { watchParty.applyingRemote = false; }, 250);
-  }
+  try { fn(); } catch (err) { wpLog('apply error', err); }
+  setTimeout(() => {
+    wpApplyDepth = Math.max(0, wpApplyDepth - 1);
+    if (wpApplyDepth === 0) watchParty.applyingRemote = false;
+  }, holdMs);
+}
+
+// Optional debug logging — turn on by running `localStorage.setItem('wp-debug', '1')`
+// in DevTools and reloading. Off by default; zero cost when off.
+const WP_DEBUG = (typeof localStorage !== 'undefined') && localStorage.getItem('wp-debug') === '1';
+function wpLog(...args) { if (WP_DEBUG) console.log('[wp]', ...args); }
+
+// Wait for the main player <video> to mount (and pick up enough metadata
+// to seek). Used by remote video navigation so the time-snap happens AFTER
+// the element is actually in the DOM and seekable, instead of guessing at
+// a fixed timeout that's too short on slow networks.
+function waitForPlayerVideo(timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const v = document.querySelector('#player-wrap video');
+      // readyState 1 = HAVE_METADATA, enough to set currentTime. We don't
+      // wait for HAVE_FUTURE_DATA because that takes much longer on a
+      // cold-start fetch and we'd rather seek early and let the player
+      // buffer than sit waiting.
+      if (v && v.readyState >= 1) return resolve(v);
+      if (v && Date.now() - start > timeoutMs / 2) return resolve(v); // got the element, just not metadata
+      if (Date.now() - start > timeoutMs) return resolve(v || null);
+      setTimeout(tick, 80);
+    };
+    tick();
+  });
+}
+
+// Combined "navigate + snap to time" for remote 'video' / 'state' messages.
+// Holds applyingRemote across the entire flow (navigation → element mount
+// → autoplay event burst → time snap) so the new video's startup events
+// don't echo back to peers as a brand-new "play at t=0" broadcast — which
+// is exactly the bug that was yanking other peers back to 0 on join.
+async function wpApplyVideoSnap(videoId, t, paused) {
+  wpLog('snap →', videoId, 't=' + t, paused ? 'paused' : 'playing');
+  // Outer hold: 4 s covers go() + fetchVideoData + renderVideo + the very
+  // first autoplay/play/canplay event burst on the new <video>.
+  wpApply(() => go('video', videoId), 4000);
+  const v = await waitForPlayerVideo(5500);
+  if (!v) { wpLog('snap: no video element after wait'); return; }
+  // Inner hold piggybacks on the outer one via the counter, then adds an
+  // extra 1.5 s buffer in case the outer is close to expiring.
+  wpApply(() => {
+    if (typeof t === 'number' && isFinite(t) && t > 0) {
+      try { v.currentTime = t; } catch (e) { wpLog('seek failed', e); }
+    }
+    if (paused) v.pause();
+    else v.play().catch(() => {});
+  }, 1500);
 }
 
 // The only <video> we want to mirror is the main player's — NOT the seek
@@ -5436,21 +5492,23 @@ function isMainPlayerVideo(el) {
 }
 
 // Local player events → broadcast. Capture phase because the play/pause/
-// seeked events on <video> don't bubble.
+// seeked events on <video> don't bubble. Every broadcast carries the
+// current videoId so peers can drop messages meant for a different video
+// (which happens briefly during navigation transitions).
 document.addEventListener('play', (e) => {
   if (!watchParty.inRoom || watchParty.applyingRemote) return;
   if (!isMainPlayerVideo(e.target)) return;
-  watchParty.broadcast({ type: 'play', t: e.target.currentTime });
+  watchParty.broadcast({ type: 'play', videoId: currentVideoId, t: e.target.currentTime });
 }, true);
 document.addEventListener('pause', (e) => {
   if (!watchParty.inRoom || watchParty.applyingRemote) return;
   if (!isMainPlayerVideo(e.target)) return;
-  watchParty.broadcast({ type: 'pause', t: e.target.currentTime });
+  watchParty.broadcast({ type: 'pause', videoId: currentVideoId, t: e.target.currentTime });
 }, true);
 document.addEventListener('seeked', (e) => {
   if (!watchParty.inRoom || watchParty.applyingRemote) return;
   if (!isMainPlayerVideo(e.target)) return;
-  watchParty.broadcast({ type: 'seek', t: e.target.currentTime });
+  watchParty.broadcast({ type: 'seek', videoId: currentVideoId, t: e.target.currentTime });
 }, true);
 
 // Periodic time sync from the HOST. Guests follow if they've drifted past
@@ -5459,7 +5517,7 @@ setInterval(() => {
   if (!watchParty.inRoom || !watchParty.isHost) return;
   const v = document.querySelector('#player-wrap video');
   if (!v) return;
-  watchParty.broadcast({ type: 'tick', t: v.currentTime, paused: v.paused });
+  watchParty.broadcast({ type: 'tick', videoId: currentVideoId, t: v.currentTime, paused: v.paused });
 }, 3000);
 
 // Inbound messages → mirror onto the local player.
@@ -5496,22 +5554,9 @@ watchParty.addEventListener('message', (e) => {
   }
 
   if (data.type === 'state') {
-    // Host's reply to our hello. Navigate to their video, then snap time.
+    wpLog('state recv', data);
     if (data.videoId && data.videoId !== currentVideoId) {
-      wpApply(() => go('video', data.videoId));
-      // Wait for the video element to mount + start loading before snapping
-      // currentTime. 900ms is a balance: long enough for renderVideo to
-      // attach the element, short enough that the user doesn't sit on a
-      // wrong-time frame for noticeably long.
-      setTimeout(() => {
-        const v = document.querySelector('#player-wrap video');
-        if (!v) return;
-        wpApply(() => {
-          if (typeof data.t === 'number') v.currentTime = data.t;
-          if (data.paused) v.pause();
-          else v.play().catch(() => {});
-        });
-      }, 900);
+      wpApplyVideoSnap(data.videoId, data.t, data.paused);
     } else if (data.videoId === currentVideoId) {
       // Same video; just align time + paused state.
       const v = document.querySelector('#player-wrap video');
@@ -5519,25 +5564,42 @@ watchParty.addEventListener('message', (e) => {
         if (typeof data.t === 'number') v.currentTime = data.t;
         if (data.paused) v.pause();
         else v.play().catch(() => {});
-      });
+      }, 700);
     }
     return;
   }
 
   if (data.type === 'video') {
+    wpLog('video recv', data.id);
     if (data.id && data.id !== currentVideoId) {
-      wpApply(() => go('video', data.id));
+      // Don't know the host's exact time yet, but assume they're at 0 (or
+      // very close) since they just navigated. The next 'tick' will pull
+      // everyone into proper alignment within ~3 s.
+      wpApplyVideoSnap(data.id, 0, false);
     }
     return;
   }
 
-  // The rest assume we're already on the right video.
+  // The rest assume we're already on the right video. Bail if there's no
+  // player visible — happens during navigation or on non-video routes.
   const v = document.querySelector('#player-wrap video');
-  if (!v) return;
+  if (!v) { wpLog('drop ' + data.type + ' — no video element'); return; }
+
+  // If the message carries a videoId and it doesn't match ours, drop it.
+  // This guards the brief window during navigation when the two peers are
+  // on different videos and a stale event from the previous video arrives.
+  if (data.videoId && data.videoId !== currentVideoId) {
+    wpLog('drop ' + data.type + ' — wrong video', data.videoId, '!=', currentVideoId);
+    return;
+  }
 
   if (data.type === 'play') {
     wpApply(() => {
-      if (typeof data.t === 'number' && Math.abs(v.currentTime - data.t) > 0.5) {
+      // Only snap currentTime when the remote is meaningfully ahead. The
+      // old "snap on any 0.5 s drift" rule got triggered by a fresh joiner's
+      // auto-play (their t=0 vs the host's actual time) and was rewinding
+      // the host every time someone joined.
+      if (typeof data.t === 'number' && data.t > 1 && Math.abs(v.currentTime - data.t) > 1.0) {
         v.currentTime = data.t;
       }
       v.play().catch(() => {});
@@ -5545,20 +5607,20 @@ watchParty.addEventListener('message', (e) => {
   } else if (data.type === 'pause') {
     wpApply(() => {
       v.pause();
-      if (typeof data.t === 'number' && Math.abs(v.currentTime - data.t) > 0.5) {
+      if (typeof data.t === 'number' && data.t > 1 && Math.abs(v.currentTime - data.t) > 1.0) {
         v.currentTime = data.t;
       }
     });
   } else if (data.type === 'seek') {
     if (typeof data.t === 'number') wpApply(() => { v.currentTime = data.t; });
   } else if (data.type === 'tick') {
-    // Only snap if we've drifted noticeably AND we're not in the middle of
-    // an ongoing seek (which has its own settle time).
-    if (typeof data.t !== 'number' || v.seeking) return;
+    // Only snap if we've drifted noticeably AND the player is in a sane
+    // state. readyState < 2 means we haven't decoded a frame yet — snapping
+    // currentTime there does nothing useful, and seeking guards against
+    // fighting an in-progress user seek.
+    if (typeof data.t !== 'number' || v.seeking || v.readyState < 2) return;
     const drift = Math.abs(v.currentTime - data.t);
     if (drift > 0.75) wpApply(() => { v.currentTime = data.t; });
-    // Track host's paused state too so a guest who unpaused locally gets
-    // re-paused by the host's next tick.
     if (data.paused && !v.paused) wpApply(() => v.pause());
     if (!data.paused && v.paused) wpApply(() => v.play().catch(() => {}));
   }
