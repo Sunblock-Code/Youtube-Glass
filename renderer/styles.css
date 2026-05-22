@@ -456,14 +456,16 @@ body {
   transform: translateY(-50%);
   /* Brighter than the previous --muted (#9b94b3) so the icon reads as
      "this is a search field" at a glance instead of looking washed out
-     against the glassy bar background. */
-  color: #d4cfea;
-  opacity: 0.75;
+     against the glassy bar background. Drop shadow lifts it off the
+     blurred glass so the edges stay crisp. */
+  color: #e8e3f5;
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
   pointer-events: none;
   transition: color 0.2s, transform 0.2s, opacity 0.2s;
   z-index: 1;
 }
-.search-wrap:hover .search-icon { opacity: 0.95; }
+.search-wrap:hover .search-icon { opacity: 1; }
 .search-hint {
   position: absolute;
   right: 6px;
@@ -498,15 +500,27 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: border-color 0.2s, background 0.2s, box-shadow 0.3s;
 }
-/* Brighter placeholder so "Search or paste a YouTube link" reads cleanly
-   instead of looking ghosted out. Slight letter-spacing + medium weight
-   add legibility against the glassy bar without competing with real input. */
-#search { font-weight: 500; letter-spacing: 0.1px; }
-#search::placeholder {
-  color: #c8c2dc;
-  opacity: 0.7;
+/* Brighter, sharper placeholder. The previous values were still being
+   softened by the bar's backdrop-blur. Three reinforcing changes:
+     - Bump opacity / brightness so the colour itself contrasts.
+     - text-shadow gives the glyph edges a defined drop, so they don't
+       blur into the glassy bar behind them.
+     - Explicit font-smoothing hints + tabular kerning keep the strokes
+       crisp on subpixel-positioned text. */
+#search {
   font-weight: 500;
   letter-spacing: 0.1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+#search::placeholder {
+  color: #e0d9f3;
+  opacity: 0.85;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: color 0.2s, opacity 0.2s;
 }
 .search-wrap:hover #search:not(:focus) {
