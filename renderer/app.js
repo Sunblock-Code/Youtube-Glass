@@ -1043,7 +1043,20 @@ async function renderHomeDashboard() {
   view.innerHTML = homeModeBar('dashboard') + `
     <div class="dash-page-header">
       <h2 class="section-title" style="margin:0;flex:1">Your dashboard</h2>
-      <button id="dash-edit" class="topnav-style-btn ${dashboardEditing ? 'primary' : ''}">${dashboardEditing ? 'Done' : 'Edit dashboard'}</button>
+      <button id="dash-edit" class="topnav-style-btn ${dashboardEditing ? 'primary' : ''}" type="button">
+        ${dashboardEditing ? `
+          <svg class="btn-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span>Done</span>
+        ` : `
+          <svg class="btn-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+          <span>Edit dashboard</span>
+        `}
+      </button>
     </div>
     ${dashboardEditing ? `
       <div class="dash-edit-banner">

@@ -1564,8 +1564,8 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 }
 
 .topnav-style-btn {
-  height: 32px; padding: 0 14px;
-  border-radius: 16px;
+  height: 34px; padding: 0 16px;
+  border-radius: 17px;
   /* Fixed-alpha glass — independent of the user's --glass-alpha slider so it
      stays readable when they crank gradient/glass intensity all the way down. */
   background: rgba(255, 255, 255, 0.07);
@@ -1573,20 +1573,38 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   color: var(--text);
-  font: inherit; font-size: 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .topnav-style-btn:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.topnav-style-btn:active { transform: scale(0.97); }
+.topnav-style-btn .btn-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
 }
 .topnav-style-btn.primary {
   background: linear-gradient(135deg, var(--accent), #ec4899);
   border-color: transparent;
   color: white;
-  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
 }
+.topnav-style-btn.primary:hover {
+  filter: brightness(1.06);
+  border-color: transparent;
+}
+.topnav-style-btn.primary .btn-icon { opacity: 1; }
 
 /* --- Dashboard --- */
 .dash-row {
