@@ -152,20 +152,20 @@ body {
    genuinely empty space (transparent body + the gaps/margins between
    surfaces), not THROUGH the content. Surfaces are intentionally NOT tied
    to the see-through slider — keeping them solid is the whole point. */
-/* Acrylic: surfaces FULLY opaque (the OS material frosts the desktop in the
-   empty space; cards must stay solid). */
+/* See-through modes: EVERY glass surface (cards, dashboard widgets, the
+   mode bar, the resume banner, dropdowns, composer …) gets its alpha from
+   --acrylic-card-alpha so the "Surface see-through" slider makes ALL the
+   boxes see-through together. Default alpha 1 = fully solid (unchanged);
+   lower it and the desktop shows through every box uniformly. */
 :root[data-bgmode="acrylic"] {
-  --glass: rgb(12, 8, 20);
-  --glass-strong: rgb(17, 11, 28);
+  --glass: rgba(12, 8, 20, var(--acrylic-card-alpha, 1));
+  --glass-strong: rgba(17, 11, 28, var(--acrylic-card-alpha, 1));
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-border-strong: rgba(255, 255, 255, 0.16);
 }
-/* Clear: surfaces are FULLY opaque — the slider must NOT touch the UI. The
-   "Background dim" slider instead controls a veil over the DESKTOP in the
-   empty space (the .bg layer below), leaving every card/panel solid. */
 :root[data-bgmode="clear"] {
-  --glass: rgb(12, 8, 20);
-  --glass-strong: rgb(17, 11, 28);
+  --glass: rgba(12, 8, 20, var(--acrylic-card-alpha, 1));
+  --glass-strong: rgba(17, 11, 28, var(--acrylic-card-alpha, 1));
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-border-strong: rgba(255, 255, 255, 0.16);
 }
