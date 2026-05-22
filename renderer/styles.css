@@ -363,7 +363,7 @@ body {
 .brand .logo {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border-radius: 9px;
   box-shadow: 0 2px 14px rgba(192, 132, 252, 0.45);
   flex-shrink: 0;
@@ -1595,7 +1595,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   opacity: 0.9;
 }
 .topnav-style-btn.primary {
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border-color: transparent;
   color: white;
   box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
@@ -1889,13 +1889,13 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .widget-more {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--muted);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
   padding: 0;
 }
-.widget-more:hover { text-decoration: underline; }
+.widget-more:hover { text-decoration: underline; color: var(--text); }
 
 /* Clock widget */
 .dash-widget-clock {
@@ -2066,7 +2066,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: inline-flex; align-items: center; gap: 6px;
   height: 38px; padding: 0 20px;
   border-radius: 19px;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   color: white; border: none; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 600;
 }
@@ -2221,7 +2221,7 @@ input[type="checkbox"].glass-check:hover {
 }
 .picker-row input[type="checkbox"]:checked,
 input[type="checkbox"].glass-check:checked {
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border-color: transparent;
   box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.18);
 }
@@ -2526,7 +2526,7 @@ input[type="checkbox"].glass-check:checked::after {
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -2868,7 +2868,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .resume-banner button:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
 .resume-banner button.primary {
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border-color: transparent;
   color: white;
   font-weight: 600;
@@ -3364,7 +3364,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .vol-fill {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  background: linear-gradient(to top, var(--accent), #ec4899);
+  background: var(--accent);
   border-radius: 0 0 4px 4px;
   height: 100%;
   transition: height 0.08s ease-out;
@@ -3642,7 +3642,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   transform: scale(1.15);
   box-shadow: 0 0 0 1px rgba(0,0,0,0.5) inset, 0 0 10px var(--accent);
 }
-.cc-color-pill[data-pcol="accent"] { background: linear-gradient(135deg, var(--accent), #ec4899); }
+.cc-color-pill[data-pcol="accent"] { background: var(--accent); }
 
 /* Playbar height sliders inside the gear popover */
 .cc-opt-height-row {
@@ -4522,7 +4522,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .modal-actions button:active { transform: scale(0.98); }
 .modal-actions button.primary {
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: white;
   font-weight: 700;
@@ -4599,7 +4599,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   padding: 0 18px;
   border-radius: 10px;
   border: 1px solid transparent;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
+  background: var(--accent);
   color: white;
   cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 600;
@@ -5027,7 +5027,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .resume-thumb-wrap .resume-thumb-progress > div {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #ec4899);
+  background: var(--accent);
   box-shadow: 0 0 6px var(--accent);
 }
 .resume-thumb-wrap .resume-thumb-time {
@@ -5190,7 +5190,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   height: 17px;
   padding: 0 5px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%);
+  background: var(--accent);
   color: #fff;
   font-size: 10px;
   font-weight: 800;
@@ -5284,7 +5284,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   border-color: var(--glass-border-strong);
 }
 .wp-join-form .modal-btn.primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%);
+  background: var(--accent);
   color: #fff;
   border-color: transparent;
   box-shadow: 0 6px 18px rgba(192, 132, 252, 0.28);
@@ -5421,7 +5421,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   padding: 0 18px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, var(--accent, #c084fc), #ec4899);
+  background: var(--accent, #c084fc);
   color: #fff;
   font: inherit;
   font-weight: 700;
@@ -5695,7 +5695,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   padding: 0 18px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%);
+  background: var(--accent);
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -5801,7 +5801,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   width: 38px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%);
+  background: var(--accent);
   color: #fff;
   cursor: pointer;
   display: inline-flex;
