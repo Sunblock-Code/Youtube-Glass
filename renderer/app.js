@@ -243,6 +243,10 @@ const DEFAULT_SETTINGS = {
                         // cards are translucent enough to let the backdrop
                         // show through). 0 = off (blanket no-backdrop-filter
                         // rule wins, keeping the smooth-composite default).
+  bgTransparency: 0,    // % — see-through modes only: scales the background
+                        // veil DOWN so the desktop shows through MORE than the
+                        // preset's baseline (e.g. below Mica's 0.40 floor).
+                        // 0 = preset default veil, 100 = fully clear desktop.
   seeThrough: 0,      // % — how transparent the UI background is. Higher = more
                       // desktop showthrough (best paired with Mica/Acrylic backdrop)
   cardGlow: true,
@@ -406,7 +410,11 @@ function applySettings(s) {
   {
     const baseVeil = { mica: 0.40, gaussian: 0.20 }[s.bgMode] || 0;
     const slider = (typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0) / 100;
-    root.style.setProperty('--clear-bg-tint', Math.min(0.85, Math.max(baseVeil, slider)).toFixed(3));
+    // Background transparency scales the veil DOWN, letting the desktop show
+    // through more than the preset's baseline (e.g. below Mica's 0.40 floor).
+    const bgTrans = Math.min(1, Math.max(0, (typeof s.bgTransparency === 'number' ? s.bgTransparency : 0) / 100));
+    const veil = Math.max(baseVeil, slider) * (1 - bgTrans);
+    root.style.setProperty('--clear-bg-tint', Math.min(0.85, Math.max(0, veil)).toFixed(3));
   }
   root.style.setProperty('--blur',        s.blur + 'px');
   root.style.setProperty('--glass-alpha', (s.glassAlpha / 100).toFixed(3));
@@ -4831,7 +4839,9 @@ function showSettings() {
             <input type="range" id="s-bgopacity" class="settings-slider" min="0" max="100" value="${typeof s.bgOpacity === 'number' ? s.bgOpacity : 100}" />
             <div class="settings-label" id="clearop-label" style="margin-top:14px;display:none"><span>Background dim <span class="hint">(Acrylic / Clear — 0 = full desktop, higher = darker veil over the desktop; UI stays solid)</span></span><span class="val" id="s-clearop-val">${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}%</span></div>
             <input type="range" id="s-clearop" class="settings-slider" min="0" max="70" value="${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}" style="display:none" />
-            <div class="settings-label" id="acrylicalpha-label" style="margin-top:14px;display:none"><span>Surface see-through <span class="hint">(Acrylic / Clear — 0 = solid cards, higher = desktop shows through the cards too)</span></span><span class="val" id="s-acrylicalpha-val">${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}%</span></div>
+            <div class="settings-label" id="bgtrans-label" style="margin-top:14px;display:none"><span>Background transparency <span class="hint">(Acrylic / Clear — higher = the desktop shows through the background more, below the preset's default veil)</span></span><span class="val" id="s-bgtrans-val">${typeof s.bgTransparency === 'number' ? s.bgTransparency : 0}%</span></div>
+            <input type="range" id="s-bgtrans" class="settings-slider" min="0" max="100" value="${typeof s.bgTransparency === 'number' ? s.bgTransparency : 0}" style="display:none" />
+            <div class="settings-label" id="acrylicalpha-label" style="margin-top:14px;display:none"><span>UI transparency <span class="hint">(Acrylic / Clear — 0 = solid cards, higher = desktop shows through the UI cards too)</span></span><span class="val" id="s-acrylicalpha-val">${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}%</span></div>
             <input type="range" id="s-acrylicalpha" class="settings-slider" min="0" max="75" value="${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}" style="display:none" />
             <div class="settings-label" id="acrylicblur-label" style="margin-top:14px;display:none"><span>Blur <span class="hint">(Acrylic / Clear — extra frost on the see-through cards; 0 = off)</span></span><span class="val" id="s-acrylicblur-val">${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}px</span></div>
             <input type="range" id="s-acrylicblur" class="settings-slider" min="0" max="40" value="${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}" style="display:none" />
@@ -5011,6 +5021,11 @@ function showSettings() {
     const showCo = ['clear', 'acrylic', 'mica', 'gaussian'].includes(mode);
     if (coLabel) coLabel.style.display = showCo ? '' : 'none';
     if (coInput) coInput.style.display = showCo ? '' : 'none';
+    // "Background transparency" — same see-through modes as the dim veil.
+    const btLabel = modalBody.querySelector('#bgtrans-label');
+    const btInput = modalBody.querySelector('#s-bgtrans');
+    if (btLabel) btLabel.style.display = showCo ? '' : 'none';
+    if (btInput) btInput.style.display = showCo ? '' : 'none';
     // "Surface see-through" + "Blur" — same set of modes (they all share the
     // acrylic CSS via the mica/gaussian → acrylic remap in applySettings).
     const aaLabel = modalBody.querySelector('#acrylicalpha-label');
@@ -5045,6 +5060,19 @@ function showSettings() {
       if (clearopVal) clearopVal.textContent = v + '%';
       setFill(clearopInput);
       update({ clearSeeThrough: v });
+    };
+  }
+  // "Background transparency": scales the desktop veil down so the desktop is
+  // more visible than the preset baseline. applySettings reads bgTransparency.
+  const bgtransInput = modalBody.querySelector('#s-bgtrans');
+  const bgtransVal   = modalBody.querySelector('#s-bgtrans-val');
+  if (bgtransInput) {
+    setFill(bgtransInput);
+    bgtransInput.oninput = () => {
+      const v = Number(bgtransInput.value);
+      if (bgtransVal) bgtransVal.textContent = v + '%';
+      setFill(bgtransInput);
+      update({ bgTransparency: v });
     };
   }
   // Surface see-through: card/titlebar alpha in see-through modes. 0% = solid
