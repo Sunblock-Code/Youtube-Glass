@@ -2280,6 +2280,7 @@ async function renderVideo(id) {
         </div>
       </div>
       <div class="related-col">
+        <div class="related-stickyhead">
         <div class="related-tabs" role="tablist" aria-label="Sidebar source">
           <button class="related-tab ${relatedSource === 'related' ? 'active' : ''}" data-rt="related" role="tab">Up next</button>
           <button class="related-tab ${relatedSource === 'subs' ? 'active' : ''}" data-rt="subs" role="tab">Subs</button>
@@ -2295,6 +2296,7 @@ async function renderVideo(id) {
               <polyline points="9 18 15 12 9 6"/>
             </svg>
           </button>
+        </div>
         </div>
         <div class="related" data-mode="${relatedMode}" data-src="${relatedSource}">
           ${relatedSource === 'related'
