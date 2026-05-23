@@ -1299,10 +1299,10 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex-direction: column;
   gap: 8px;
   padding: 10px 14px;
-  /* No side margin: span the full sticky-header content width so the box
-     lines up with the COMMENTS title and the filter pills and is as wide as
-     the panel (a touch wider than the comment rows, which is fine). */
-  margin: 0 0 10px;
+  /* Inset to match the comment rows (comments-list has 4px padding + the
+     .comment row has 4px) so the box is the same width as the comments
+     below it, not the full extra-wide sticky-header panel. */
+  margin: 0 8px 10px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
