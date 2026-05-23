@@ -991,10 +991,21 @@ async function renderHomeForYou() {
   const watched = new Set(hist.map(h => h.id).filter(Boolean));
   const seedIds = [...watched].slice(0, 6);
 
+  // Cap each phase so "Building suggestions" can't hang forever when Piped
+  // instances are slow/failing (each api.streams call can otherwise iterate
+  // every instance at 8s apiece). On timeout we just render what we have.
+  const withTimeout = (p, ms) => Promise.race([
+    Promise.resolve(p).catch(() => null),
+    new Promise(res => setTimeout(() => res(null), ms)),
+  ]);
+
   let related = [];
   if (seedIds.length) {
-    const lists = await Promise.all(seedIds.map(id => fetchSidebarRelated(id).catch(() => [])));
-    related = lists.flat();
+    const lists = await withTimeout(
+      Promise.all(seedIds.map(id => fetchSidebarRelated(id).catch(() => []))),
+      12000
+    );
+    related = Array.isArray(lists) ? lists.flat() : [];
   }
   const seen = new Set();
   const pool = [];
@@ -1008,7 +1019,7 @@ async function renderHomeForYou() {
   shuffleInPlace(pool);
   // Sparse history → top up with subs so the page is never near-empty.
   if (pool.length < 12) {
-    const filler = await fetchSubItems().catch(() => []);
+    const filler = (await withTimeout(fetchSubItems().catch(() => []), 8000)) || [];
     for (const it of filler) {
       if (!it || !it.url) continue;
       const vid = videoIdFromUrl(it.url);
