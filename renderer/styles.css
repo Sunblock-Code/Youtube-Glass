@@ -618,13 +618,17 @@ body {
   color: #fff;
 }
 .donate-heart {
-  display: inline-block;
-  font-size: 11px;
-  line-height: 1;
+  /* SVG heart (was an emoji that rendered oversized and made the pill look
+     taller). Fixed 12px, so it sits cleanly inside the 36px button. */
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  color: #f472b6;
   filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.6));
   animation: donateBeat 1.6s ease-in-out infinite;
   transform-origin: center;
 }
+.donate-heart svg { display: block; }
 @keyframes donateBeat {
   0%, 60%, 100% { transform: scale(1); }
   10%           { transform: scale(1.18); }
