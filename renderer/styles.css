@@ -5629,7 +5629,10 @@ body.dragging-panel * { cursor: grabbing !important; }
   display: flex;
   gap: 4px;
   padding: 0 0 8px;
-  margin: 0;
+  /* Match the .comments-stickyhead overhang (margin: 0 -14px) so the tab row
+     and the panel below it share the exact same outer width / edges. Without
+     this the tabs sat 14px narrower per side than the panel. */
+  margin: 0 -14px;
   border-bottom: 1px solid var(--glass-border);
   align-items: center;
 }
