@@ -834,17 +834,17 @@ function wireHomeModeBar() {
   const activeBtn = bar.querySelector('.home-modebtn.active');
   if (!indicator || !activeBtn) return;
 
-  // Move the indicator under a given button. We use offsetLeft/offsetTop —
-  // those are in the bar's coordinate space (relative to its border-box).
-  // The indicator is absolutely positioned with `top:0; left:0`, which
-  // references the PADDING box (inside the border), so we subtract the
-  // bar's border width (clientLeft/clientTop) to land exactly on the
-  // button's outer corner. Same trick for width/height: offsetWidth/Height
-  // include the button's own border, and our indicator is box-sizing:
-  // border-box, so its 1px border fits cleanly inside without inflating.
+  // Move the indicator under a given button. offsetLeft/offsetTop are
+  // measured from the bar's PADDING box — the exact same origin the
+  // indicator's `top:0; left:0` resolves against — so they map straight to
+  // the indicator's transform with no border correction needed. (We used
+  // to subtract clientLeft/clientTop here; that pushed the box ~1px up and
+  // left, so the outline sat high/off-centre on the active tab.) Width and
+  // height come from offsetWidth/Height; the indicator is border-box so its
+  // 1px border fits inside without inflating past the tab.
   const positionAt = (btn) => {
-    const x = btn.offsetLeft - bar.clientLeft;
-    const y = btn.offsetTop  - bar.clientTop;
+    const x = btn.offsetLeft;
+    const y = btn.offsetTop;
     indicator.style.transform = `translate(${x}px, ${y}px)`;
     indicator.style.width  = btn.offsetWidth  + 'px';
     indicator.style.height = btn.offsetHeight + 'px';
