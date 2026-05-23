@@ -48,10 +48,32 @@ export class WatchParty extends EventTarget {
     this.isHost = false;
     this.applyingRemote = false; // set true while we apply an inbound event so the
                                  // resulting local play/pause doesn't echo back
+    this.displayName = 'Guest';  // local user's name, shown in the room roster
+    this._roster = new Map();    // HOST only: guest peerId → display name
+    this._rosterList = [];       // EVERYONE: [{name, host}] for the "who's watching" UI
   }
 
   get peerCount() { return this.connections.size; }
   get inRoom() { return !!this.roomCode; }
+
+  // Set the local display name (call before create/join). Used in the roster.
+  setName(name) {
+    this.displayName = (String(name || '').trim().slice(0, 32)) || 'Guest';
+  }
+  // The current room roster — [{ name, host }] including ourselves. Host builds
+  // it from guest 'identify' messages; guests receive it via 'roster'.
+  getRoster() { return this._rosterList.slice(); }
+
+  // HOST: rebuild the roster (self + identified guests) and push it to guests.
+  _broadcastRoster() {
+    if (!this.isHost) return;
+    const peers = [{ name: this.displayName, host: true }];
+    for (const nm of this._roster.values()) peers.push({ name: nm, host: false });
+    this._rosterList = peers;
+    const payload = JSON.stringify({ type: 'roster', peers });
+    for (const conn of this.connections.values()) { try { conn.send(payload); } catch {} }
+    this._emitState();
+  }
 
   // --- Public API -----------------------------------------------------------
 
@@ -65,6 +87,9 @@ export class WatchParty extends EventTarget {
         await this._openPeer(ROOM_CODE_PREFIX + code);
         this.roomCode = code;
         this.isHost = true;
+        // Seed the roster with ourselves; guests get added as they identify.
+        this._roster.clear();
+        this._rosterList = [{ name: this.displayName, host: true }];
         // Host accepts inbound connections from guests.
         this.peer.on('connection', (conn) => this._wireConnection(conn));
         this._emitState();
@@ -106,8 +131,10 @@ export class WatchParty extends EventTarget {
     });
     this._wireConnection(conn);
     this._emitState();
-    // Say hello so the host sends us its current state.
+    // Say hello so the host sends us its current state, and identify
+    // ourselves so the host can add us to the room roster.
     this.send(conn, { type: 'hello' });
+    this.send(conn, { type: 'identify', name: this.displayName });
   }
 
   leave() {
@@ -121,6 +148,8 @@ export class WatchParty extends EventTarget {
     }
     this.roomCode = null;
     this.isHost = false;
+    this._roster.clear();
+    this._rosterList = [];
     this._emitState();
   }
 
@@ -163,6 +192,7 @@ export class WatchParty extends EventTarget {
     conn.on('data', (raw) => this._handleData(conn, raw));
     conn.on('close', () => {
       this.connections.delete(conn.peer);
+      if (this.isHost && this._roster.delete(conn.peer)) this._broadcastRoster();
       this._emitState();
       // If the host disappears we leave the room entirely; there's no point
       // sitting alone in an orphaned guest connection.
@@ -182,6 +212,23 @@ export class WatchParty extends EventTarget {
     try { msg = typeof raw === 'string' ? JSON.parse(raw) : raw; }
     catch { return; }
     if (!msg || typeof msg !== 'object') return;
+    // Roster handshake — handled here, never relayed or dispatched to the app.
+    // Guests 'identify' to the host; the host keeps the authoritative roster
+    // and pushes it back to everyone as 'roster'.
+    if (msg.type === 'identify') {
+      if (this.isHost) {
+        this._roster.set(conn.peer, (String(msg.name || '').trim().slice(0, 32)) || 'Guest');
+        this._broadcastRoster();
+      }
+      return;
+    }
+    if (msg.type === 'roster') {
+      if (!this.isHost) {
+        this._rosterList = Array.isArray(msg.peers) ? msg.peers : [];
+        this._emitState();
+      }
+      return;
+    }
     // If we're the host, relay anything from a guest to all other guests
     // so they stay in sync without each guest needing a direct line to
     // every other guest.
@@ -202,6 +249,7 @@ export class WatchParty extends EventTarget {
       isHost: this.isHost,
       roomCode: this.roomCode,
       peerCount: this.peerCount,
+      roster: this.getRoster(),
     }}));
   }
 

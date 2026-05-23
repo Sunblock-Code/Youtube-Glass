@@ -5554,7 +5554,55 @@ body.dragging-panel * { cursor: grabbing !important; }
   gap: 8px;
   padding: 14px 14px 12px;
   justify-content: center;
+  /* It's a <button> now — neutralize button defaults and signal it's clickable
+     (click to expand the "who's watching" roster below). */
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
 }
+.wp-peers-card:hover { border-color: var(--accent); background: var(--accent-soft); }
+.wp-peers-card.expanded { border-color: var(--accent); }
+.wp-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding: 8px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.wp-roster-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.wp-roster-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80;
+  flex-shrink: 0;
+}
+.wp-roster-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-roster-you { color: var(--muted); font-size: 11px; }
+.wp-roster-host {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.wp-roster-empty { padding: 10px; text-align: center; color: var(--muted); font-size: 12px; }
 .wp-peers-top {
   display: flex;
   align-items: center;

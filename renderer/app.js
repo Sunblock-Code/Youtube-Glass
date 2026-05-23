@@ -5921,7 +5921,9 @@ function showWatchPartyStart() {
   };
 
   modalBody.querySelector('#wp-start').onclick = async () => {
-    if (!requireName()) return;
+    const nm = requireName();
+    if (!nm) return;
+    watchParty.setName(nm);
     setMsg('Creating room…', 'loading');
     modalBody.querySelector('#wp-start').disabled = true;
     modalBody.querySelector('#wp-join-go').disabled = true;
@@ -5948,7 +5950,9 @@ function showWatchPartyStart() {
   });
 
   modalBody.querySelector('#wp-join-go').onclick = async () => {
-    if (!requireName()) return;
+    const nm = requireName();
+    if (!nm) return;
+    watchParty.setName(nm);
     const code = normalizeRoomCode(codeInput.value);
     if (code.length !== ROOM_CODE_LENGTH) {
       setMsg(`Code should be ${ROOM_CODE_LENGTH} characters.`, 'error');
@@ -5986,7 +5990,7 @@ function showWatchPartyRoom() {
       <button class="modal-btn" id="wp-copy" type="button">Copy</button>
     </div>
     <div class="wp-info-row">
-      <div class="wp-info-card wp-peers-card" aria-label="${total} ${total === 1 ? 'person' : 'people'} watching">
+      <button class="wp-info-card wp-peers-card" id="wp-peers-card" type="button" aria-label="${total} ${total === 1 ? 'person' : 'people'} watching — click to see who">
         <div class="wp-peers-top">
           <span class="wp-info-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5999,7 +6003,7 @@ function showWatchPartyRoom() {
           <strong class="wp-peers-count">${total}</strong>
         </div>
         <div class="wp-peers-label">${total === 1 ? 'PERSON' : 'PEOPLE'} WATCHING</div>
-      </div>
+      </button>
       <div class="wp-info-card wp-tip-card">
         <div class="wp-tip-grid">
           <div class="wp-action wp-action-play" aria-label="Play">
@@ -6030,6 +6034,7 @@ function showWatchPartyRoom() {
         <div class="wp-tip-text">Everyone follows along.</div>
       </div>
     </div>
+    <div class="wp-roster" id="wp-roster" hidden></div>
     <div class="modal-actions">
       <button class="modal-btn" id="wp-close" type="button">Close</button>
       <button class="modal-btn danger" id="wp-leave" type="button">Leave room</button>
@@ -6045,8 +6050,40 @@ function showWatchPartyRoom() {
       setTimeout(() => { copyBtn.textContent = orig; }, 1200);
     } catch { /* clipboard may be unavailable */ }
   };
-  modalBody.querySelector('#wp-close').onclick = closeModal;
+  // "Who's watching" roster — clicking the peers card expands the name list.
+  const peersCard = modalBody.querySelector('#wp-peers-card');
+  const rosterBox = modalBody.querySelector('#wp-roster');
+  const countEl = modalBody.querySelector('.wp-peers-count');
+  const labelEl = modalBody.querySelector('.wp-peers-label');
+  const renderRoster = () => {
+    const list = watchParty.getRoster();
+    const n = list.length || (watchParty.peerCount + 1);
+    if (countEl) countEl.textContent = n;
+    if (labelEl) labelEl.textContent = (n === 1 ? 'PERSON' : 'PEOPLE') + ' WATCHING';
+    if (!rosterBox) return;
+    rosterBox.innerHTML = list.length
+      ? list.map(p => `<div class="wp-roster-item">
+          <span class="wp-roster-dot" aria-hidden="true"></span>
+          <span class="wp-roster-name">${escape(p.name || 'Guest')}${p.name === watchParty.displayName ? ' <span class="wp-roster-you">(you)</span>' : ''}</span>
+          ${p.host ? '<span class="wp-roster-host">Host</span>' : ''}
+        </div>`).join('')
+      : '<div class="wp-roster-empty">Just you so far.</div>';
+  };
+  renderRoster();
+  if (peersCard && rosterBox) {
+    peersCard.onclick = () => {
+      rosterBox.hidden = !rosterBox.hidden;
+      peersCard.classList.toggle('expanded', !rosterBox.hidden);
+    };
+  }
+  // Keep the count + roster live as people join / leave while the modal is open.
+  const onWpState = () => renderRoster();
+  watchParty.addEventListener('state', onWpState);
+  const cleanupRoster = () => watchParty.removeEventListener('state', onWpState);
+
+  modalBody.querySelector('#wp-close').onclick = () => { cleanupRoster(); closeModal(); };
   modalBody.querySelector('#wp-leave').onclick = () => {
+    cleanupRoster();
     watchParty.leave();
     closeModal();
   };
