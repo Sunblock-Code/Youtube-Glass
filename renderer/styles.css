@@ -1297,10 +1297,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex-direction: column;
   gap: 8px;
   padding: 10px 14px;
-  /* Inset to match the comment rows (comments-list has 4px padding + the
-     .comment row has 4px) so the box is the same width as the comments
-     below it, not the full extra-wide sticky-header panel. */
-  margin: 0 8px 10px;
+  /* Align the box to the comment rows below. Measured: the sticky header's
+     content box runs to the column edges and the comment rows sit 4px inside
+     that (the list's 4px padding), so a 4px side margin lands the composer on
+     exactly the same left/right edges as the comments. (Was 8px, which
+     double-counted the inset and left the box 4px narrow per side.) */
+  margin: 0 4px 10px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
@@ -1391,7 +1393,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: flex;
   gap: 6px;
   padding: 0;
-  margin: 0;
+  /* 4px side margin so the Top/New/… row lines up on the same left/right
+     edges as the composer and the comment rows (all at the list's inset). */
+  margin: 0 4px;
   flex-wrap: wrap;
   background: transparent;
 }
@@ -2912,24 +2916,38 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .resume-banner strong { color: var(--accent); font-weight: 600; margin: 0 2px; }
 .resume-banner button {
-  height: 28px;
-  padding: 0 14px;
-  border-radius: 14px;
+  height: 30px;
+  /* Equal min-width so Resume and Start over render the same size instead of
+     hugging their (different-length) labels. */
+  min-width: 104px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
   border: 1px solid var(--glass-border);
   background: var(--glass);
   color: var(--text);
   cursor: pointer;
-  font: inherit; font-size: 12px;
-  transition: background 0.15s, border-color 0.15s;
+  font: inherit; font-size: 12px; font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s ease, box-shadow 0.15s;
 }
-.resume-banner button:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
+.resume-banner button:hover {
+  background: var(--glass-strong);
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+}
 .resume-banner button.primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #a855f7);
   border-color: transparent;
-  color: white;
-  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 4px 16px var(--accent-soft);
 }
-.resume-banner button.primary:hover { filter: brightness(1.08); }
+.resume-banner button.primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px var(--accent-soft);
+}
 .resume-banner.fading { opacity: 0; transition: opacity 0.3s; }
 @keyframes resumeFade {
   from { opacity: 0; }

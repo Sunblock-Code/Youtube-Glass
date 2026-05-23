@@ -3931,8 +3931,17 @@ function attachCustomControls(v, root, data = {}) {
       // VTT cue text can carry markup/voice tags (<v Bob>, <i>, …). Strip to
       // plain text + newlines; the box owns the visual styling.
       const cueText = (cue) => {
+        let s = (cue && cue.text) || '';
+        // WebVTT cues can carry inline tags: karaoke timestamp tags like
+        // <00:05:39.199>, <c.classname>…</c> spans, <v Speaker> voices,
+        // <i>/<b>/<u>. We paint plain text in a custom overlay, so strip every
+        // tag — otherwise the timestamp tags render literally (e.g.
+        // "either<00:05:39.199> or<00:05:39.440>"). A "<" not starting a tag
+        // (no closing ">") is left alone, so text like "5 < 10" survives.
+        s = s.replace(/<\/?[^>]+>/g, '');
+        // Decode HTML entities (&amp;, &#39;, …) now that no tags remain.
         const tmp = document.createElement('div');
-        tmp.innerHTML = ((cue && cue.text) || '').replace(/\r?\n/g, '<br>');
+        tmp.innerHTML = s;
         return (tmp.textContent || '').trim();
       };
       const paintCues = (tt) => {
