@@ -598,12 +598,12 @@ body {
 .topnav .donate-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 14px 0 12px;
-  /* Match the account/username button's text metrics so the two pills are
-     the same visual size (both are 36px tall via .topnav button). */
-  font-size: 12px;
-  letter-spacing: 0.5px;
+  gap: 5px;
+  /* Compact to roughly the username pill's footprint: tighter padding,
+     smaller text, minimal letter-spacing, smaller heart (below). */
+  padding: 0 11px 0 9px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
   background: linear-gradient(135deg,
     rgba(244, 114, 182, 0.18),
     rgba(236, 72,  153, 0.10));
@@ -619,7 +619,7 @@ body {
 }
 .donate-heart {
   display: inline-block;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1;
   filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.6));
   animation: donateBeat 1.6s ease-in-out infinite;
