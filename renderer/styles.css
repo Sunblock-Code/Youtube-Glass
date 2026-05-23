@@ -1892,11 +1892,11 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   border-color: var(--glass-border-strong);
 }
 .dash-widget .widget-title {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--muted);
-  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text);
+  font-weight: 700;
 }
 .dash-widget .widget-title-row {
   display: flex; align-items: center; gap: 8px;
@@ -1906,13 +1906,20 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .widget-more {
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--accent);
   font: inherit;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  padding: 0;
+  /* padding + matching negative margin gives a rounded hover hit-area
+     without nudging the label out of the title row's baseline. */
+  padding: 3px 8px;
+  margin: -3px -8px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
 }
-.widget-more:hover { text-decoration: underline; color: var(--text); }
+.widget-more:hover { color: var(--text); background: var(--accent-soft); }
 
 /* Clock widget */
 .dash-widget-clock {
