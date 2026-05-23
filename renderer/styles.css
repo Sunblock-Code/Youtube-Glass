@@ -365,7 +365,9 @@ body {
   width: 32px; height: 32px;
   background: var(--accent);
   border-radius: 9px;
-  box-shadow: 0 2px 14px rgba(192, 132, 252, 0.45);
+  /* Neutral glow (was a hardcoded purple that clashed with non-purple
+     themes like Aurora). */
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
 }
 .brand .logo svg {
@@ -380,7 +382,7 @@ body {
   font-weight: 700;
   letter-spacing: 6px;
   line-height: 1;
-  color: #e9d5ff;                       /* solid lavender — sharp at any size */
+  color: var(--accent);                 /* matches the logo + active theme */
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
   padding-right: 4px;
@@ -598,6 +600,10 @@ body {
   align-items: center;
   gap: 6px;
   padding: 0 14px 0 12px;
+  /* Match the account/username button's text metrics so the two pills are
+     the same visual size (both are 36px tall via .topnav button). */
+  font-size: 12px;
+  letter-spacing: 0.5px;
   background: linear-gradient(135deg,
     rgba(244, 114, 182, 0.18),
     rgba(236, 72,  153, 0.10));
@@ -1280,10 +1286,10 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex-direction: column;
   gap: 8px;
   padding: 10px 14px;
-  /* 4px side margin lines the box up with the comment rows below (the
-     comments-list has 4px horizontal padding), so the composer is the
-     SAME width as the comments. Bigger radius = clearly rounded. */
-  margin: 0 4px 10px;
+  /* 8px side margin lines the box edges up with the comment CONTENT below
+     (comments-list 4px padding + .comment 4px padding = 8px), so the
+     composer is the same width as the comments. Bigger radius = rounded. */
+  margin: 0 8px 10px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
@@ -1899,9 +1905,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 
 /* Clock widget */
 .dash-widget-clock {
-  background:
-    radial-gradient(ellipse 80% 100% at 100% 0%, var(--accent-soft) 0%, transparent 70%),
-    var(--glass);
+  /* Plain glass surface — the old accent-soft radial gave it a coloured
+     (green on Aurora) tint that didn't match the other widgets. */
+  background: var(--glass);
 }
 .dash-widget-clock .clock-greeting {
   font-size: 12px;
@@ -2110,6 +2116,11 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .home-modebtn {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
   background: transparent;
   border: none;
   color: var(--muted);
