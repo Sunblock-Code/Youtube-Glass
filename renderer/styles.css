@@ -2104,6 +2104,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
+  align-items: center;        /* center the tabs in the row (were top-anchored) */
   gap: 4px;
   margin-bottom: 20px;
   padding: 4px;
@@ -2139,9 +2140,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   align-items: center;
   justify-content: center;
   text-align: center;
-  /* Fixed height + flex centering = text dead-centre vertically (line-height:1
-     left the label sitting high in the pill). */
-  height: 34px;
+  /* No fixed height — size to content with symmetric padding so the label is
+     centred, and the grid's align-items:center centres the whole tab in the
+     row (the fixed height was getting top-anchored in a taller grid row). */
   background: transparent;
   border: none;
   color: var(--muted);
@@ -2149,7 +2150,8 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  padding: 7px 16px;
+  line-height: 1.1;
+  padding: 9px 16px;
   border-radius: 9px;
   transition: color 0.22s ease;
 }
