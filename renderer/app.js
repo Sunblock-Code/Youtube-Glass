@@ -651,14 +651,18 @@ async function go(route, ...args) {
 
   // Watch-together: if we're in a room and the user navigated to a video,
   // tell everyone else so they follow. Skip when we ourselves are applying a
-  // remote nav — otherwise we'd echo it back as a fresh broadcast.
-  if (route === 'video' && watchParty.inRoom && !watchParty.applyingRemote) {
-    watchParty.broadcast({ type: 'video', id: args[0] });
+  // remote nav — otherwise we'd echo it back as a fresh broadcast. Direct-URL
+  // playback rides the same 'video' message with a url:: token as the id, so
+  // peers navigate via go('url', …) instead of go('video', …).
+  if (watchParty.inRoom && !watchParty.applyingRemote) {
+    if (route === 'video')    watchParty.broadcast({ type: 'video', id: args[0] });
+    else if (route === 'url') watchParty.broadcast({ type: 'video', id: URL_TOKEN_PREFIX + args[0] });
   }
   try {
     if (route === 'home')         await renderDashboard();
     else if (route === 'search')  await renderSearch(args[0]);
     else if (route === 'video')   await renderVideo(args[0]);
+    else if (route === 'url')     await renderDirectUrl(args[0]);
     else if (route === 'subs')    await renderSubs();
     else if (route === 'shorts')  await renderShorts();
     else if (route === 'history') await renderHistory();
@@ -1944,6 +1948,113 @@ function shortsCard(item) {
       </div>
     </div>
   `;
+}
+
+// ---------------------------------------------------------------------------
+// Direct media URL playback. Lets the user paste a link that *is* a media
+// file/stream (.mp4 / .webm / .m3u8 / .mpd / …) and play it in the Glass
+// player with the same watch-together sync as YouTube videos. This plays a URL
+// you already have — it does NOT scrape video out of a web page or touch DRM.
+// ---------------------------------------------------------------------------
+const URL_TOKEN_PREFIX = 'url::';
+const MEDIA_EXT_RE = /\.(m3u8|mpd|mp4|m4v|webm|ogv|ogg|mov|mkv|m4a|mp3|aac|flac|wav|opus|ts)(\?|#|$)/i;
+
+// Returns the URL if `q` looks like a direct media link (a recognized media
+// extension, or an HLS/DASH manifest), else null. The search box uses this to
+// route media links to the direct player instead of running a text search.
+function directMediaUrlFromAny(q) {
+  if (typeof q !== 'string' || !/^https?:\/\//i.test(q.trim())) return null;
+  const url = q.trim();
+  let path = '';
+  try { path = new URL(url).pathname; } catch { return null; }
+  if (MEDIA_EXT_RE.test(path)) return url;
+  if (/\.m3u8|\.mpd/i.test(url)) return url;   // manifest with the type in the query string
+  return null;
+}
+
+// Which loader the URL needs: HLS (hls.js / native), DASH (dash.js), or a
+// plain progressive file the <video> element can take via its src directly.
+function classifyMediaUrl(u) {
+  const s = String(u).toLowerCase();
+  let path = s;
+  try { path = new URL(u).pathname.toLowerCase(); } catch {}
+  if (/\.m3u8(\?|#|$)/.test(path) || s.includes('.m3u8')) return 'hls';
+  if (/\.mpd(\?|#|$)/.test(path)  || s.includes('.mpd'))  return 'dash';
+  return 'file';
+}
+
+// A human-ish label for the page heading — the filename, falling back to host.
+function directUrlName(url) {
+  try {
+    const u = new URL(url);
+    const base = decodeURIComponent((u.pathname.split('/').filter(Boolean).pop()) || '');
+    return base || u.hostname;
+  } catch { return String(url); }
+}
+
+async function renderDirectUrl(url) {
+  const name = directUrlName(url);
+  const kind = classifyMediaUrl(url);
+  const kindLabel = kind === 'hls' ? 'HLS stream' : kind === 'dash' ? 'DASH stream' : 'progressive file';
+  view.innerHTML = `
+    <div class="direct-page">
+      <div class="direct-head">
+        <h1 class="direct-title">${escape(name)}</h1>
+        <div class="direct-sub">Direct media URL · ${kindLabel}</div>
+      </div>
+      <div class="player-wrap direct-wrap" id="player-wrap">
+        <video controls autoplay playsinline></video>
+      </div>
+      <div class="direct-error" id="direct-error" hidden></div>
+      <div class="direct-meta">
+        <span class="direct-urltext" title="${escapeAttr(url)}">${escape(url)}</span>
+        <button class="direct-act" id="direct-open" type="button">Open original</button>
+      </div>
+    </div>
+  `;
+  const v = view.querySelector('#player-wrap video');
+  const errEl = view.querySelector('#direct-error');
+  // Identify this media for watch-together with a url:: token used everywhere a
+  // YouTube videoId would be — so play / pause / seek / tick all key off it and
+  // peers stay in sync exactly like a normal video.
+  currentVideoId = URL_TOKEN_PREFIX + url;
+
+  const showErr = (detail) => {
+    if (!errEl) return;
+    errEl.hidden = false;
+    errEl.innerHTML =
+      `<strong>Couldn't play this URL.</strong> ${escape(detail || '')}<br>` +
+      `It needs to be a direct link to the media itself (.mp4, .webm, .m3u8, .mpd, …). ` +
+      `A link to a web page won't work — Glass plays the file, it doesn't rip it out of a site.`;
+  };
+
+  v.addEventListener('error', () => {
+    const code = v.error && v.error.code;
+    showErr(code ? `Media error (code ${code}).` : '');
+  });
+
+  try {
+    if (kind === 'hls')       play(v, { hls: url });
+    else if (kind === 'dash') play(v, { dash: url });
+    else                      play(v, { videoStreams: [{ url, quality: '1080', videoOnly: false }] });
+  } catch (e) {
+    showErr(e && e.message);
+  }
+
+  // Fatal hls.js / dash.js failures don't fire the <video> error event, so hook
+  // them directly. play() stashes the instances on the element.
+  if (v._hls && window.Hls) {
+    v._hls.on(window.Hls.Events.ERROR, (_ev, data) => {
+      if (data && data.fatal) showErr('Stream error (' + (data.type || 'hls') + ').');
+    });
+  }
+  if (v._dash && window.dashjs) {
+    try { v._dash.on(window.dashjs.MediaPlayer.events.ERROR, () => showErr('DASH stream error.')); } catch {}
+  }
+
+  const openBtn = view.querySelector('#direct-open');
+  if (openBtn) openBtn.onclick = () =>
+    window.app?.openExternal?.(url) || window.open(url, '_blank');
 }
 
 async function renderVideo(id) {
@@ -4560,6 +4671,12 @@ search.addEventListener('keydown', e => {
       go('video', id);
       return;
     }
+    const media = directMediaUrlFromAny(q);
+    if (media) {
+      search.value = '';
+      go('url', media);
+      return;
+    }
     go('search', q);
   } else if (e.key === 'Escape') {
     search.blur();
@@ -5492,9 +5609,12 @@ function waitForPlayerVideo(timeoutMs = 6000) {
 // is exactly the bug that was yanking other peers back to 0 on join.
 async function wpApplyVideoSnap(videoId, t, paused) {
   wpLog('snap →', videoId, 't=' + t, paused ? 'paused' : 'playing');
+  // Direct-URL media is carried as a url:: token in place of a YouTube
+  // videoId — route it to the direct player instead of renderVideo.
+  const asUrl = typeof videoId === 'string' && videoId.startsWith(URL_TOKEN_PREFIX);
   // Outer hold: 4 s covers go() + fetchVideoData + renderVideo + the very
   // first autoplay/play/canplay event burst on the new <video>.
-  wpApply(() => go('video', videoId), 4000);
+  wpApply(() => asUrl ? go('url', videoId.slice(URL_TOKEN_PREFIX.length)) : go('video', videoId), 4000);
   const v = await waitForPlayerVideo(5500);
   if (!v) { wpLog('snap: no video element after wait'); return; }
   // Inner hold piggybacks on the outer one via the counter, then adds an

@@ -6011,3 +6011,41 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-join-card .wp-join-form {
   margin-top: 0;
 }
+
+/* --- Direct media URL player ---------------------------------------------
+   A pasted .mp4 / .webm / .m3u8 / .mpd link plays here with native controls.
+   Reuses the .player-wrap frame (rounded 16:9 black box) but lets arbitrary
+   aspect ratios letterbox via object-fit:contain instead of stretching. */
+.direct-page { max-width: 1100px; margin: 0 auto; padding: 4px 0 48px; }
+.direct-head { margin-bottom: 14px; }
+.direct-title {
+  font-size: 18px; font-weight: 700; color: var(--text);
+  margin: 0; line-height: 1.3; word-break: break-word;
+}
+.direct-sub {
+  margin-top: 3px; font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.direct-wrap video { object-fit: contain; cursor: default; background: #000; }
+.direct-error {
+  margin-top: 14px; padding: 14px 16px; border-radius: 12px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); font-size: 13px; line-height: 1.5;
+}
+.direct-error strong { color: var(--accent); }
+.direct-meta {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 14px; font-size: 12px; color: var(--muted);
+}
+.direct-urltext {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.direct-act {
+  flex: 0 0 auto;
+  padding: 7px 14px; border-radius: 9px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); font: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.direct-act:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
