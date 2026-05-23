@@ -2088,7 +2088,13 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
    slides from the previously active button to the newly active one. */
 .home-modebar {
   position: relative;
-  display: flex;
+  /* Grid with equal columns → all four tabs are the SAME width (matched to
+     the widest label), so the bar is evenly divided instead of each tab
+     hugging its text. The sliding indicator still measures offsetLeft/Width
+     per button, so it lands correctly. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 4px;
   margin-bottom: 20px;
   padding: 4px;
