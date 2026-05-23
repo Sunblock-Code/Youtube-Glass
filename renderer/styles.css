@@ -604,30 +604,27 @@ body {
   max-height: 34px;
   box-sizing: border-box;
 }
-/* Donate button — pink-tinted gradient pill with a gentle heart pulse */
+/* Donate button — same glass pill BODY as the username pill (identical
+   fill + border + 34px box), so it can never read as bigger/heavier. The
+   pink heart + soft-pink label are the only things that mark it as Donate.
+   (Measured: donate and account both render at exactly 34.0px, same top
+   and bottom — the old saturated pink fill just made it *look* taller.) */
 .topnav .donate-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  /* Same text metrics as the username pill so they read identical; both are
-     pinned to 34px above. line-height:1 + overflow:hidden guarantee the
-     content can't make the pill render taller than that box. */
   padding: 0 13px 0 11px;
   font-size: 12px;
   line-height: 1;
   overflow: hidden;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg,
-    rgba(244, 114, 182, 0.18),
-    rgba(236, 72,  153, 0.10));
-  border-color: rgba(244, 114, 182, 0.35);
+  background: var(--glass);
+  border-color: var(--glass-border);
   color: #fbcfe8;
 }
 .topnav .donate-btn:hover {
-  background: linear-gradient(135deg,
-    rgba(244, 114, 182, 0.30),
-    rgba(236, 72,  153, 0.18));
-  border-color: rgba(244, 114, 182, 0.65);
+  background: rgba(244, 114, 182, 0.14);
+  border-color: rgba(244, 114, 182, 0.45);
   color: #fff;
 }
 .donate-heart {
