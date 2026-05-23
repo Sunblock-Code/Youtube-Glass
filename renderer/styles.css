@@ -1230,7 +1230,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
    wrapper now owns that behaviour. */
 .comments-stickyhead {
   position: sticky;
-  top: 0;
+  /* Sits just below the pinned .comments-tabs row (32px tab + 8px pad + 1px
+     border = 41px) so the two stack instead of overlapping when pinned. */
+  top: 41px;
   z-index: 7;
   /* OPAQUE on purpose — no backdrop-filter. A sticky element with
      backdrop-filter forces the compositor to re-rasterize the blurred
@@ -5663,6 +5665,14 @@ body.dragging-panel * { cursor: grabbing !important; }
 .comments-tabs {
   display: flex;
   gap: 4px;
+  /* Pin the Comments / Chat tab row at the very top so it doesn't scroll away
+     with the list (the sticky header below it pins at top:41px, just under
+     these). Transparent + no other style change, so the look is identical —
+     in the normal side layout it's a no-op (the list scrolls internally below
+     it); it only engages in the page-scroll layout modes. */
+  position: sticky;
+  top: 0;
+  z-index: 8;
   padding: 0 0 8px;
   /* Match the .comments-stickyhead overhang (margin: 0 -14px) so the tab row
      and the panel below it share the exact same outer width / edges. Without
@@ -5720,6 +5730,10 @@ body.dragging-panel * { cursor: grabbing !important; }
    sibling .related-tabs rule). */
 .player-page.comments-collapsed .comments-tabs,
 .player-page.merged-collapsed .comments-tabs { display: none; }
+/* With the tab row hidden in the sliver modes, drop the sticky header back to
+   top:0 so the 41px tab offset doesn't leave a gap above it. */
+.player-page.comments-collapsed .comments-stickyhead,
+.player-page.merged-collapsed .comments-stickyhead { top: 0; }
 
 /* data-cside toggles which block is visible. Default = comments. */
 .comments-col[data-cside="chat"] .comments-stickyhead,
