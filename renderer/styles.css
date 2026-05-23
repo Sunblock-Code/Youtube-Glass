@@ -551,7 +551,7 @@ body {
 :root[data-search="square"] #search { border-radius: 12px; }
 :root[data-search="square"] .search-hint { border-radius: 6px; }
 
-.topnav { display: flex; gap: 4px; }
+.topnav { display: flex; gap: 4px; align-items: center; }
 .topnav button {
   height: 36px; padding: 0 16px;
   border-radius: 18px;
@@ -599,11 +599,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  /* Compact to roughly the username pill's footprint: tighter padding,
-     smaller text, minimal letter-spacing, smaller heart (below). */
-  padding: 0 11px 0 9px;
-  font-size: 11px;
-  letter-spacing: 0.3px;
+  /* Same text metrics as the username pill so they read identical; both are
+     36px tall via .topnav button. */
+  padding: 0 13px 0 11px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
   background: linear-gradient(135deg,
     rgba(244, 114, 182, 0.18),
     rgba(236, 72,  153, 0.10));
@@ -624,7 +624,6 @@ body {
   align-items: center;
   line-height: 0;
   color: #f472b6;
-  filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.6));
   animation: donateBeat 1.6s ease-in-out infinite;
   transform-origin: center;
 }
@@ -2130,7 +2129,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   align-items: center;
   justify-content: center;
   text-align: center;
-  line-height: 1;
+  /* Fixed height + flex centering = text dead-centre vertically (line-height:1
+     left the label sitting high in the pill). */
+  height: 34px;
   background: transparent;
   border: none;
   color: var(--muted);
