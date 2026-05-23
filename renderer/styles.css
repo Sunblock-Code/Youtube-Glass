@@ -628,14 +628,12 @@ body {
   color: #fff;
 }
 .donate-heart {
-  /* SVG heart (was an emoji that rendered oversized and made the pill look
-     taller). Fixed 12px, so it sits cleanly inside the 36px button. */
+  /* Fixed 12px SVG heart, static (the pulsing scale animation made the pill
+     visually bulge / look taller than the username pill). */
   display: inline-flex;
   align-items: center;
   line-height: 0;
   color: #f472b6;
-  animation: donateBeat 1.6s ease-in-out infinite;
-  transform-origin: center;
 }
 .donate-heart svg { display: block; }
 @keyframes donateBeat {
