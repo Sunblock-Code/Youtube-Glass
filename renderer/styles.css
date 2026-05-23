@@ -594,6 +594,16 @@ body {
 }
 .topnav .icon-btn { width: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 
+/* Force the Donate and username pills to the EXACT same box: same explicit
+   height + border-box, so neither can end up taller than the other no matter
+   what their content is. */
+.topnav .donate-btn,
+.topnav #account-btn {
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  box-sizing: border-box;
+}
 /* Donate button — pink-tinted gradient pill with a gentle heart pulse */
 .topnav .donate-btn {
   display: inline-flex;
