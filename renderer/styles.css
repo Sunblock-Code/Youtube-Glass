@@ -1469,15 +1469,16 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .comment-stats { font-size: 11px; color: var(--muted); }
 
 /* Sticky wrapper for the sidebar's tab row (Up next / Subs / History) plus
-   the active-label header — mirrors .comments-stickyhead. Keeps those top
-   items pinned instead of scrolling away with the list in the static / narrow
-   layout modes (where .related-col stops being a fixed-height column), and is
-   OPAQUE so list rows don't bleed through it as they scroll underneath. */
+   the active-label header. Keeps those top items pinned instead of scrolling
+   away with the list. Background stays TRANSPARENT so the Up next / Subs /
+   History tabs read identically to the Comments / Chat tabs (which sit
+   transparent on the page) — an opaque panel here made the sidebar tabs look
+   heavier than every other tab bar in the app. */
 .related-stickyhead {
   position: sticky;
   top: 0;
   z-index: 7;
-  background: linear-gradient(to bottom, rgb(22, 14, 32) 0%, rgb(20, 12, 30) 100%);
+  background: transparent;
 }
 /* In the collapsed sliver / merged-tab modes the wrapper must step out of the
    layout so the existing centering rules on .related-header still apply. */
