@@ -610,9 +610,12 @@ body {
   align-items: center;
   gap: 5px;
   /* Same text metrics as the username pill so they read identical; both are
-     36px tall via .topnav button. */
+     pinned to 34px above. line-height:1 + overflow:hidden guarantee the
+     content can't make the pill render taller than that box. */
   padding: 0 13px 0 11px;
   font-size: 12px;
+  line-height: 1;
+  overflow: hidden;
   letter-spacing: 0.5px;
   background: linear-gradient(135deg,
     rgba(244, 114, 182, 0.18),
