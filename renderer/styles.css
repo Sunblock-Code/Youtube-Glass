@@ -1143,6 +1143,27 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
     height: auto;
     max-height: none;
   }
+  /* The ≤1700 layout spans the related sidebar across BOTH grid rows. In one
+     column that span makes it overlap the video — the Up next/Subs/History tab
+     row renders on top of (and behind) the player. Reset to a clean vertical
+     stack: video → Up next → comments. (data-comments-scoped to override the
+     ≤1700 rules, which use the same specificity.) */
+  :root[data-comments="auto"] .player-page,
+  :root[data-comments="side"] .player-page {
+    grid-template-rows: auto auto auto;
+    row-gap: 16px;
+  }
+  .player-page > .player-col { grid-row: 1; grid-column: 1; }
+  :root[data-comments="auto"] .player-page > .related-col,
+  :root[data-comments="side"] .player-page > .related-col {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  :root[data-comments="auto"] .player-page > .comments-col,
+  :root[data-comments="side"] .player-page > .comments-col {
+    grid-row: 3;
+    grid-column: 1;
+  }
 }
 
 /* --- Comments placement overrides (Settings) --- */
