@@ -1245,14 +1245,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
               rgb(22, 14, 32) 0%,
               rgb(20, 12, 30) 100%);
   border-bottom: 1px solid var(--glass-border);
-  /* Extend the chrome wider than the column's content area: negative
-     horizontal margin pulls the box outward, matching horizontal padding
-     puts the content (title, composer, filters) back in the same place
-     so only the BACKGROUND grows. The 14px overhang fits inside the
-     20px grid-gap to either side, so it doesn't bleed into adjacent
-     columns. */
-  padding: 8px 14px 10px;
-  margin: 0 -14px 8px;
+  /* Align the panel to the comment rows below it (the list's 4px row inset)
+     instead of the old wider overhang, so the "box that says COMMENTS"
+     matches the width of the comment boxes. Zero horizontal padding keeps
+     the title / composer / filters flush at that same comment edge. */
+  padding: 8px 0 10px;
+  margin: 0 4px 8px;
   box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.55);
 }
 .comments-header {
@@ -1300,12 +1298,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   flex-direction: column;
   gap: 8px;
   padding: 10px 14px;
-  /* Align the box to the comment rows below. Measured: the sticky header's
-     content box runs to the column edges and the comment rows sit 4px inside
-     that (the list's 4px padding), so a 4px side margin lands the composer on
-     exactly the same left/right edges as the comments. (Was 8px, which
-     double-counted the inset and left the box 4px narrow per side.) */
-  margin: 0 4px 10px;
+  /* Flush within the panel — the panel now sits at the comment-row edges, so
+     a zero side margin lands the composer on exactly the comment-row width. */
+  margin: 0 0 10px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
@@ -1396,9 +1391,9 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: flex;
   gap: 6px;
   padding: 0;
-  /* 4px side margin so the Top/New/… row lines up on the same left/right
-     edges as the composer and the comment rows (all at the list's inset). */
-  margin: 0 4px;
+  /* Flush within the panel — lines up with the composer, comment rows, and
+     the panel edges (all at the comment-row width now). */
+  margin: 0;
   flex-wrap: wrap;
   background: transparent;
 }
@@ -5723,10 +5718,9 @@ body.dragging-panel * { cursor: grabbing !important; }
   top: 0;
   z-index: 8;
   padding: 0 0 8px;
-  /* Match the .comments-stickyhead overhang (margin: 0 -14px) so the tab row
-     and the panel below it share the exact same outer width / edges. Without
-     this the tabs sat 14px narrower per side than the panel. */
-  margin: 0 -14px;
+  /* Match the .comments-stickyhead panel below it (now at the comment-row
+     edges, margin: 0 4px) so the tab row and the panel share the same width. */
+  margin: 0 4px;
   border-bottom: 1px solid var(--glass-border);
   align-items: center;
 }
