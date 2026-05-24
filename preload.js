@@ -144,6 +144,7 @@ contextBridge.exposeInMainWorld('app', {
     install: () => ipcRenderer.invoke('ytdlp:install'),
     getVideo: (videoId) => ipcRenderer.invoke('ytdlp:get-video', videoId),
     getChannelVideos: (channelId, limit) => ipcRenderer.invoke('ytdlp:get-channel-videos', channelId, limit),
+    getRelated: (videoId, limit) => ipcRenderer.invoke('ytdlp:get-related', videoId, limit),
     download: (videoId, opts) => ipcRenderer.invoke('ytdlp:download', videoId, opts),
     onInstallProgress: (cb) => {
       const handler = (_e, p) => cb(p);

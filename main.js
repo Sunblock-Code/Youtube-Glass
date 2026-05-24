@@ -348,6 +348,15 @@ ipcMain.handle('ytdlp:get-channel-videos', async (_e, channelId, limit) => {
   }
 });
 
+ipcMain.handle('ytdlp:get-related', async (_e, videoId, limit) => {
+  try {
+    const items = await ytdlp.getRelated(videoId, limit);
+    return { ok: true, items };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
 ipcMain.handle('ytdlp:download', async (event, videoId, opts) => {
   try {
     const result = await ytdlp.downloadVideo(videoId, opts || {}, (p) => {

@@ -3234,15 +3234,34 @@ async function fetchSidebarRelated(videoId) {
     const raw = sessionStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length) return parsed;
     }
   } catch {}
   let items = [];
-  try {
-    const piped = await api.streams(videoId);
-    if (piped && Array.isArray(piped.relatedStreams)) items = piped.relatedStreams;
-  } catch {}
-  try { sessionStorage.setItem(KEY, JSON.stringify(items)); } catch {}
+  // yt-dlp's autoplay mix (RD<id>) works over the local IP even when Piped's
+  // /streams is bot-blocked — the common case here, since this only runs when
+  // the yt-dlp video path already returned no related. Try it FIRST: Piped's
+  // instance sweep can hang ~2 min when every instance is blocked.
+  if (window.app?.ytdlp?.getRelated) {
+    try {
+      const r = await window.app.ytdlp.getRelated(videoId, 20);
+      if (r && r.ok && Array.isArray(r.items)) items = r.items;
+    } catch {}
+  }
+  // Fall back to Piped if yt-dlp gave nothing — capped at 6s so a blocked-
+  // instance sweep can't hang the tab.
+  if (!items.length) {
+    try {
+      const piped = await Promise.race([
+        api.streams(videoId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('piped timeout')), 6000)),
+      ]);
+      if (piped && Array.isArray(piped.relatedStreams)) items = piped.relatedStreams;
+    } catch {}
+  }
+  // Only cache a non-empty result, so a transient block doesn't stick the
+  // empty list for the rest of the session.
+  if (items.length) { try { sessionStorage.setItem(KEY, JSON.stringify(items)); } catch {} }
   return items;
 }
 
