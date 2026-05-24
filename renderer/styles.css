@@ -1270,7 +1270,8 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   margin: 0;
 }
 .comments-header .section-title,
-.related-header  .section-title {
+.related-header  .section-title,
+.dash-page-header .section-title {
   margin: 0;
   flex: 1;
   /* Glass wordmark styling — same lavender-glow treatment as the GLASS
