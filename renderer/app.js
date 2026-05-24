@@ -2746,8 +2746,14 @@ async function renderVideo(id) {
     t.addEventListener('click', () => renderSource(t.dataset.rt));
   });
   // If the user previously selected Subs/History, the static initial HTML
-  // showed a loader — kick off the actual render now.
-  if (relatedSource !== 'related') renderSource(relatedSource);
+  // showed a loader — kick off the actual render now. ALSO run it for "Up
+  // next" when data.relatedStreams is empty: the yt-dlp data path returns no
+  // related videos, so without this the tab is left permanently blank instead
+  // of running the Piped fetchSidebarRelated fallback (which fills it, or
+  // shows a "No related videos" message if that fails too).
+  if (relatedSource !== 'related' || !((data.relatedStreams || []).length)) {
+    renderSource(relatedSource);
+  }
 
   const toggle = view.querySelector('#related-toggle');
   const playerPage = view.querySelector('.player-page');
