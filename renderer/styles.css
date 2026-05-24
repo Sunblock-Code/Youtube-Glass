@@ -1234,16 +1234,11 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      border = 41px) so the two stack instead of overlapping when pinned. */
   top: 41px;
   z-index: 7;
-  /* OPAQUE on purpose — no backdrop-filter. A sticky element with
-     backdrop-filter forces the compositor to re-rasterize the blurred
-     region every frame as comments scroll behind it (made far worse by
-     the always-animating background blobs), which is what made the
-     comments column smear and glitch while scrolling. An opaque
-     background needs nothing read back from behind it, so the header
-     just composites once and scrolling stays smooth. */
-  background: linear-gradient(to bottom,
-              rgb(22, 14, 32) 0%,
-              rgb(20, 12, 30) 100%);
+  /* Same --glass surface as the comments list below, so the header reads as
+     the same panel instead of a darker, separate box. Keep it a PLAIN colour
+     (never backdrop-filter): a sticky element with backdrop-filter re-
+     rasterizes every frame as comments scroll behind it and smears. */
+  background: var(--glass);
   border-bottom: 1px solid var(--glass-border);
   /* Align the panel to the comment rows below it (the list's 4px row inset)
      instead of the old wider overhang, so the "box that says COMMENTS"
@@ -1251,7 +1246,6 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      the title / composer / filters flush at that same comment edge. */
   padding: 8px 0 10px;
   margin: 0 4px 8px;
-  box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.55);
 }
 .comments-header {
   display: flex;
