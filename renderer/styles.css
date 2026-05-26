@@ -896,6 +896,19 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      and scroll state stable when the user scrolls the description / video. */
   overscroll-behavior: contain;
 }
+/* Comments list: unlike the related-col video cards (which need 4px side
+   padding so their hover rings aren't clipped by the scroll container), comment
+   rows have only a border-bottom — there's no side hover effect to clip. So we
+   trade the side PADDING for side MARGIN. That pulls the list's scroll box in to
+   44–876 so it lines up flush with the sticky COMMENTS header and the rows,
+   instead of the box bleeding 4px wider on each side (40–880) than everything
+   stacked above and inside it. Top/bottom padding stays for breathing room. */
+.player-page > .comments-col .comments-list {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 4px;
+  margin-right: 4px;
+}
 
 /* Collapsed states — sidebars become 28px slivers flush to the window edges */
 .player-page.related-collapsed  { grid-template-columns: 320px minmax(0, 1fr) 28px; }
