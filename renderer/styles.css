@@ -1173,6 +1173,14 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
     grid-row: 3;
     grid-column: 1;
   }
+  /* No sticky headers in the single-column stack — pinning makes the related
+     tab row and the comments header overlap the video/description stacked
+     above them. Let them scroll with their own section instead. */
+  .player-page .related-stickyhead,
+  .player-page .comments-tabs,
+  .player-page .comments-stickyhead {
+    position: static;
+  }
 }
 
 /* --- Comments placement overrides (Settings) --- */
