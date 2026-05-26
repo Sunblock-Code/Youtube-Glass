@@ -5952,7 +5952,13 @@ body.dragging-panel * { cursor: grabbing !important; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 4px 10px;
+  /* Side MARGIN (not padding) so the composer's box — and its bottom divider —
+     line up flush with the Comments/Chat tab row above (margin: 0 4px) and the
+     message bubbles below (which inset 4px via .chat-messages padding). With
+     side padding instead, the composer's border-box sat 4px wider per side than
+     the tab row, so the input + send button visibly spilled past the tabs. */
+  padding: 4px 0 10px;
+  margin: 0 4px;
   border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
 }
