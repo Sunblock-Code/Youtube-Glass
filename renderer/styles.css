@@ -645,6 +645,30 @@ body {
   color: #f472b6;
 }
 .donate-heart svg { display: block; }
+
+/* ------------------------------------------------------------------
+   Narrow window (<=1000px, down to the 900px min): stop the titlebar
+   overflowing into the native min/max/close buttons.
+
+   The titlebar is a grid (brand . back . forward . search(1fr) . topnav)
+   with 160px of right padding reserved for the OS caption buttons. The
+   search column is 1fr, so it soaks up all slack and the topnav's right
+   edge normally lands right at that reserved edge. But below ~970px the
+   fixed columns' combined min-widths exceed the room available, the grid
+   overflows, and the topnav spills right — straight under the close /
+   maximize buttons (measured: 70px of overlap at the 900px min width).
+
+   Reclaim the space WITHOUT dropping the brand wordmark: tighten the
+   inter-column gap, trim the left padding, slim the search field (hide
+   its keyboard-hint badge and the 80px of right padding it reserved), and
+   pull the topnav buttons closer. That frees ~100px (>the ~70px needed),
+   so the grid fits again and the topnav snaps back clear of the controls. */
+@media (max-width: 1000px) {
+  .titlebar { gap: 8px; padding-left: 10px; }
+  .search-hint { display: none; }
+  #search { padding-right: 16px; }
+  .topnav { gap: 2px; }
+}
 @keyframes donateBeat {
   0%, 60%, 100% { transform: scale(1); }
   10%           { transform: scale(1.18); }
