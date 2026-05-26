@@ -593,6 +593,15 @@ body {
   border-color: rgba(192, 132, 252, 0.35);
 }
 .topnav .icon-btn { width: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* Icon-only buttons (Subs/Shorts/History icons + watch-party, settings, Pass)
+   were the same dim --muted as text labels, which reads poorly at icon size.
+   Brighten their resting colour to --text so the icons are clearly legible;
+   text-label buttons keep the muted resting look. */
+.topnav .icon-btn,
+:root[data-topnav="icon"] .topnav button[data-route],
+:root[data-topnav="both"] .topnav button[data-route] {
+  color: var(--text);
+}
 
 /* Force the Donate and username pills to the EXACT same box: same explicit
    height + border-box, so neither can end up taller than the other no matter
