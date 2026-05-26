@@ -2701,7 +2701,7 @@ async function renderVideo(id) {
       // from Piped — harmless retry.
       if (!items.length) {
         relatedListEl.innerHTML = `<div class="loader" style="padding:30px">Loading</div>`;
-        items = await fetchSidebarRelated(id);
+        items = await fetchSidebarRelated(id, channelId);
         if (gen !== sourceGen) return;
         // Stash on data so subsequent tab switches use the cached result
         // without another sessionStorage round trip.
@@ -3227,7 +3227,7 @@ function videoCard(item) {
 // doesn't expose related videos), so without this the Up next tab is
 // permanently empty whenever yt-dlp is the primary fetcher. Cached by
 // video id in sessionStorage for the duration of the session.
-async function fetchSidebarRelated(videoId) {
+async function fetchSidebarRelated(videoId, channelId) {
   if (!videoId) return [];
   const KEY = `sidebar-related:${videoId}`;
   try {
@@ -3257,6 +3257,20 @@ async function fetchSidebarRelated(videoId) {
         new Promise((_, reject) => setTimeout(() => reject(new Error('piped timeout')), 6000)),
       ]);
       if (piped && Array.isArray(piped.relatedStreams)) items = piped.relatedStreams;
+    } catch {}
+  }
+  // Last resort: if both the autoplay mix and Piped came back empty (both can
+  // be bot-blocked by YouTube — the usual reason "Up next" is blank), fall
+  // back to the uploader's own recent uploads. The channel "/videos" listing
+  // is far less likely to be blocked than /streams or the RD mix, so this
+  // keeps the tab populated with the same creator's videos rather than nothing.
+  // Drop the currently-playing video so it doesn't head its own "Up next".
+  if (!items.length && channelId && window.app?.ytdlp?.getChannelVideos) {
+    try {
+      const r = await window.app.ytdlp.getChannelVideos(channelId, 20);
+      if (r && r.ok && Array.isArray(r.items)) {
+        items = r.items.filter(v => videoIdFromUrl(v.url) !== videoId);
+      }
     } catch {}
   }
   // Only cache a non-empty result, so a transient block doesn't stick the
