@@ -6307,3 +6307,40 @@ body.dragging-panel * { cursor: grabbing !important; }
   cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .direct-act:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* Watch2Gether embed — a docked <webview> running the real w2g room (sync,
+   chat and playback are all w2g's). Scoped to w2g.tv via search-box routing;
+   this is not a general web view. Fills the content height so the room is
+   roomy, with a glass frame + rounded corners to sit in the Glass UI. */
+.w2g-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 104px);
+  min-height: 360px;
+}
+.w2g-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.w2g-headtext { flex: 1; min-width: 0; }
+.w2g-title {
+  font-size: 18px; font-weight: 700; color: var(--text);
+  margin: 0; line-height: 1.3;
+}
+.w2g-sub {
+  margin-top: 3px; font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.w2g-frame {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.55);
+}
+.w2g-frame webview {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

@@ -671,6 +671,7 @@ async function go(route, ...args) {
     else if (route === 'search')  await renderSearch(args[0]);
     else if (route === 'video')   await renderVideo(args[0]);
     else if (route === 'url')     await renderDirectUrl(args[0]);
+    else if (route === 'w2g')     await renderW2G(args[0]);
     else if (route === 'subs')    await renderSubs();
     else if (route === 'shorts')  await renderShorts();
     else if (route === 'history') await renderHistory();
@@ -1980,6 +1981,21 @@ function directMediaUrlFromAny(q) {
   return null;
 }
 
+// Watch2Gether room links. The search box routes these to the embedded w2g
+// panel (a <webview> running the real w2g app — sync + chat + playback all
+// work because it IS w2g) instead of a dead-end text search. Deliberately
+// scoped to w2g.tv ONLY: this is a Watch2Gether integration, not a general
+// "open any site in Glass" browser.
+function w2gUrlFromAny(q) {
+  if (typeof q !== 'string' || !/^https?:\/\//i.test(q.trim())) return null;
+  const url = q.trim();
+  try {
+    const h = new URL(url).hostname.toLowerCase();
+    if (h === 'w2g.tv' || h.endsWith('.w2g.tv')) return url;
+  } catch {}
+  return null;
+}
+
 // Which loader the URL needs: HLS (hls.js / native), DASH (dash.js), or a
 // plain progressive file the <video> element can take via its src directly.
 function classifyMediaUrl(u) {
@@ -2063,6 +2079,48 @@ async function renderDirectUrl(url) {
   const openBtn = view.querySelector('#direct-open');
   if (openBtn) openBtn.onclick = () =>
     window.app?.openExternal?.(url) || window.open(url, '_blank');
+}
+
+// Embedded Watch2Gether room. A docked <webview> loads the real w2g page, so
+// the room's sync, playlist, chat and video playback all work for free (it's
+// the actual w2g app, just inside a Glass panel). The <webview> tag is enabled
+// in main.js (webviewTag) and the guest runs sandboxed with no Node access.
+async function renderW2G(url) {
+  view.innerHTML = `
+    <div class="w2g-page">
+      <div class="w2g-head">
+        <div class="w2g-headtext">
+          <h1 class="w2g-title">Watch2Gether</h1>
+          <div class="w2g-sub">Embedded room · sync &amp; chat handled by w2g.tv</div>
+        </div>
+        <button class="direct-act" id="w2g-reload" type="button">Reload</button>
+        <button class="direct-act" id="w2g-open" type="button">Open in browser</button>
+      </div>
+      <div class="w2g-frame">
+        <webview id="w2g-webview" src="${escapeAttr(url)}" partition="persist:w2g"></webview>
+      </div>
+      <div class="direct-error" id="w2g-error" hidden></div>
+    </div>
+  `;
+  const wv = view.querySelector('#w2g-webview');
+  const errEl = view.querySelector('#w2g-error');
+  const openExt = () => { if (window.app?.openExternal) window.app.openExternal(url); else window.open(url, '_blank'); };
+  view.querySelector('#w2g-open')?.addEventListener('click', openExt);
+  view.querySelector('#w2g-reload')?.addEventListener('click', () => { try { wv?.reload(); } catch {} });
+  if (wv) {
+    wv.addEventListener('did-finish-load', () => { if (errEl) errEl.hidden = true; });
+    wv.addEventListener('did-fail-load', (e) => {
+      // -3 = ERR_ABORTED, fired for sub-resource/redirect hops; only surface
+      // a real top-level failure.
+      if (e && e.isMainFrame !== false && e.errorCode && e.errorCode !== -3 && errEl) {
+        errEl.hidden = false;
+        errEl.innerHTML =
+          `<strong>Couldn't load the Watch2Gether room.</strong> ` +
+          `(${escape(String(e.errorCode))} ${escape(e.errorDescription || '')}) — ` +
+          `try Reload, or open it in your browser.`;
+      }
+    });
+  }
 }
 
 async function renderVideo(id) {
@@ -4759,6 +4817,12 @@ search.addEventListener('keydown', e => {
     if (media) {
       search.value = '';
       go('url', media);
+      return;
+    }
+    const w2g = w2gUrlFromAny(q);
+    if (w2g) {
+      search.value = '';
+      go('w2g', w2g);
       return;
     }
     go('search', q);

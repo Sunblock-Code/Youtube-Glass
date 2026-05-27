@@ -90,6 +90,11 @@ function createWindow() {
       // audio-sync drift loop. Disabling background throttling lets audio
       // keep playing while the window is tucked away and keeps A/V aligned.
       backgroundThrottling: false,
+      // Enables the <webview> tag, used ONLY for the docked Watch2Gether room
+      // panel (renderer/app.js renderW2G). The guest page runs sandboxed with
+      // no Node access; the search box only routes w2g.tv hosts into it, so
+      // this is not a general "embed any site" browser.
+      webviewTag: true,
     },
   });
 
