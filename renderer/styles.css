@@ -1345,11 +1345,17 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      border = 41px) so the two stack instead of overlapping when pinned. */
   top: 41px;
   z-index: 7;
-  /* Same --glass surface as the comments list below, so the header reads as
-     the same panel instead of a darker, separate box. Keep it a PLAIN colour
-     (never backdrop-filter): a sticky element with backdrop-filter re-
-     rasterizes every frame as comments scroll behind it and smears. */
-  background: var(--glass);
+  /* Frosted, mostly-opaque dark surface so comments stay readable as they
+     scroll UNDER the pinned header instead of bleeding through it — the old
+     near-transparent --glass let the rows (and, in see-through modes, the
+     desktop) show straight through, which read as "ugly". The UI text is
+     light, so the backdrop has to be DARK to read, and a high tint alpha —
+     NOT a CSS backdrop-filter — carries it: backdrop-filter is force-disabled
+     in acrylic/clear anyway (it can't reach the OS desktop) and on a sticky
+     element it ghosts as content scrolls behind. In acrylic the ~10% that
+     still shows through is the OS-frosted desktop, so it reads as frosted
+     glass without any of that smear. */
+  background: rgba(11, 7, 17, 0.9);
   border-bottom: 1px solid var(--glass-border);
   /* Align the panel to the comment rows below it (the list's 4px row inset)
      instead of the old wider overhang, so the "box that says COMMENTS"
@@ -5861,12 +5867,13 @@ body.dragging-panel * { cursor: grabbing !important; }
   gap: 4px;
   /* Pin the Comments / Chat tab row at the very top so it doesn't scroll away
      with the list (the sticky header below it pins at top:41px, just under
-     these). Transparent + no other style change, so the look is identical —
-     in the normal side layout it's a no-op (the list scrolls internally below
-     it); it only engages in the page-scroll layout modes. */
+     these). Same frosted dark surface as .comments-stickyhead so the whole
+     pinned region reads as one block and comments don't bleed through the tab
+     row either as they scroll under it. */
   position: sticky;
   top: 0;
   z-index: 8;
+  background: rgba(11, 7, 17, 0.9);
   padding: 0 0 8px;
   /* Match the .comments-stickyhead panel below it (now at the comment-row
      edges, margin: 0 4px) so the tab row and the panel share the same width. */
