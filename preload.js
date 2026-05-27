@@ -127,6 +127,15 @@ contextBridge.exposeInMainWorld('app', {
   toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
   maximize:       () => ipcRenderer.invoke('window:maximize'),
   unmaximize:     () => ipcRenderer.invoke('window:unmaximize'),
+  // Custom window controls (we draw our own min/max/close — see
+  // .window-controls — instead of the native titlebar buttons).
+  minimize:       () => ipcRenderer.invoke('window:minimize'),
+  closeWindow:    () => ipcRenderer.invoke('window:close'),
+  onMaximizeChange: (cb) => {
+    const handler = (_e, isMax) => cb(isMax);
+    ipcRenderer.on('window:maximize-changed', handler);
+    return () => ipcRenderer.removeListener('window:maximize-changed', handler);
+  },
   settingsRead:   () => ipcRenderer.invoke('settings:read'),
   settingsWrite:  (json) => ipcRenderer.invoke('settings:write', json),
   pipedAuth: {

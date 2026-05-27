@@ -333,7 +333,7 @@ body {
   gap: 16px;
   align-items: center;
   padding: 0 16px;
-  padding-right: 160px; /* leave room for native window controls */
+  padding-right: 8px; /* small inset — custom .window-controls sit at the corner */
   height: 56px;
   background: rgba(10, 6, 18, 0.85);
   backdrop-filter: blur(40px) saturate(160%);
@@ -405,7 +405,7 @@ body {
    button added a 5th child — without a matching track the grid put forward
    into the 1fr (stretch) slot, ballooning it and shoving the search box +
    nav out of place ("buttons all fucked up"). */
-.titlebar { grid-template-columns: auto auto auto 1fr auto; }
+.titlebar { grid-template-columns: auto auto auto 1fr auto auto; }
 .brand { padding: 4px 8px; gap: 11px; }
 
 .back-btn {
@@ -645,6 +645,42 @@ body {
   color: #f472b6;
 }
 .donate-heart svg { display: block; }
+
+/* Custom window controls — minimize / maximize-restore / close. The window
+   is frameless (no native caption buttons); we draw these ourselves so they
+   match the rounded-glass icon style of the rest of the titlebar. They're the
+   last grid column, sitting flush toward the top-right corner. */
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+.win-ctrl {
+  width: 34px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.win-ctrl:hover { background: var(--glass); color: var(--text); }
+.win-ctrl:active { transform: scale(0.92); }
+/* Close keeps the conventional red hover so it reads as "close" at a glance,
+   even while sharing the rounded shape of the other icons. */
+.win-close:hover { background: #e5484d; color: #fff; }
+/* Maximize button swaps glyphs via an .is-max class on the button (NOT the
+   SVG's .hidden property — SVGElement doesn't implement that IDL attribute, so
+   it never actually hides). Restore glyph is hidden until the window maximizes. */
+.win-restore-glyph { display: none; }
+.win-ctrl.is-max .win-max-glyph { display: none; }
+.win-ctrl.is-max .win-restore-glyph { display: block; }
 
 /* ------------------------------------------------------------------
    Narrow window (<=1000px, down to the 900px min): stop the titlebar

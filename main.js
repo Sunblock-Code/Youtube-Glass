@@ -72,12 +72,12 @@ function createWindow() {
     transparent: launchedTransparent,
     backgroundColor: launchedTransparent ? '#00000000' : '#1a0d2e',
     icon: iconPath,
+    // Frameless: the titlebar is hidden and we draw our OWN min/max/close
+    // buttons (.window-controls) so they match the app's rounded-glass icon
+    // style instead of the native OS look. No titleBarOverlay → no native
+    // caption buttons. The window stays resizable and draggable (the titlebar
+    // is a -webkit-app-region: drag surface in styles.css).
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#e8d8ff',
-      height: 56,
-    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -92,6 +92,17 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+
+  // Tell the renderer when the OS maximize state flips (e.g. via double-click
+  // on the drag region, Win+Up, or snap) so the custom maximize/restore button
+  // can swap its glyph to match.
+  const sendMaxState = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximize-changed', mainWindow.isMaximized());
+    }
+  };
+  mainWindow.on('maximize', sendMaxState);
+  mainWindow.on('unmaximize', sendMaxState);
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
@@ -198,6 +209,8 @@ ipcMain.handle('window:toggle-maximize', () => {
 });
 ipcMain.handle('window:maximize',   () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.maximize(); });
 ipcMain.handle('window:unmaximize', () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.unmaximize(); });
+ipcMain.handle('window:minimize',   () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize(); });
+ipcMain.handle('window:close',      () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close(); });
 
 // Windows 11 only — Mica / Acrylic / Tabbed material on the window background.
 // Silently no-ops on other OSes / older Windows.

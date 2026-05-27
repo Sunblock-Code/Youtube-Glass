@@ -4757,6 +4757,29 @@ accountBtn.onclick = () => {
 
 document.getElementById('home-btn').onclick = () => go('home');
 
+// Custom window controls (frameless window — see .window-controls in
+// index.html). Min / maximize-toggle / close drive the main process through
+// the preload bridge; the maximize button swaps to a "restore" glyph while the
+// window is maximized, kept in sync via the main-process maximize events.
+(() => {
+  const minBtn = document.getElementById('win-min');
+  const maxBtn = document.getElementById('win-max');
+  const closeBtn = document.getElementById('win-close');
+  if (minBtn) minBtn.onclick = () => window.app?.minimize?.();
+  if (maxBtn) maxBtn.onclick = () => window.app?.toggleMaximize?.();
+  if (closeBtn) closeBtn.onclick = () => window.app?.closeWindow?.();
+  // Swap the maximize glyph for a "restore" one while maximized. Toggle a
+  // class on the button (CSS shows the right glyph) rather than the SVG's
+  // .hidden property, which SVGElement doesn't implement.
+  const setMaxUI = (isMax) => {
+    if (!maxBtn) return;
+    maxBtn.classList.toggle('is-max', !!isMax);
+    maxBtn.title = isMax ? 'Restore' : 'Maximize';
+    maxBtn.setAttribute('aria-label', isMax ? 'Restore' : 'Maximize');
+  };
+  if (window.app?.onMaximizeChange) window.app.onMaximizeChange(setMaxUI);
+})();
+
 settingsBtn.onclick = showSettings;
 
 function showSettings() {
