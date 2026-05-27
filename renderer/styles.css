@@ -2653,6 +2653,51 @@ input[type="checkbox"].glass-check:checked::after {
   margin: 8px 0 0;
 }
 
+/* Theme tab — collapsible sub-sections (Appearance / Components / Donate).
+   Each item is a thin card; clicking its head expands one body at a time so
+   the long Theme tab stays compact. */
+.settings-accordion { display: flex; flex-direction: column; gap: 8px; }
+.accordion-item {
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
+}
+.accordion-item.open {
+  border-color: var(--accent-soft);
+  background: rgba(255, 255, 255, 0.035);
+}
+.accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 11px 13px;
+  border: none;
+  background: transparent;
+  color: #e9e4ff;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.accordion-head:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
+.accordion-chevron {
+  flex-shrink: 0;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+.accordion-item.open .accordion-chevron { transform: rotate(90deg); }
+.accordion-body { display: none; padding: 4px 13px 12px; }
+.accordion-item.open .accordion-body { display: block; }
+/* First label/control sits right under the head — drop the big top margin. */
+.accordion-body > .settings-label:first-child { margin-top: 0; }
+
 /* Settings slider — full-width, fill-up track, modern thumb.
    The background gradient is set inline via JS (setFill) on every input
    event so the fill recomputes reliably — Chromium occasionally fails to

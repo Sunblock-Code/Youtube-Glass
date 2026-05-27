@@ -4809,54 +4809,82 @@ function showSettings() {
         <div class="settings-pane active" data-pane="theme" role="tabpanel">
           <section class="settings-section">
             <h3><span class="dot"></span>Theme</h3>
-            <div class="settings-label">Color</div>
-            <div class="theme-options">${themeBtns}</div>
-            <div class="settings-label">Background motion <span class="hint">(gradient only)</span></div>
-            <div class="theme-options">
-              <button class="theme-pill ${s.motion === 'still' ? 'active' : ''}" data-motion="still">Still</button>
-              <button class="theme-pill ${s.motion === 'subtle' ? 'active' : ''}" data-motion="subtle">Subtle</button>
-              <button class="theme-pill ${s.motion === 'lively' ? 'active' : ''}" data-motion="lively">Lively</button>
-            </div>
-            <label class="check-row">
-              <input type="checkbox" id="s-glow" ${s.cardGlow ? 'checked' : ''} class="glass-check" />
-              Card glow on hover
-            </label>
-            <div class="settings-label">Search bar shape</div>
-            <div class="theme-options">
-              <button class="theme-pill ${s.searchStyle === 'pill' ? 'active' : ''}" data-search="pill">Pill</button>
-              <button class="theme-pill ${s.searchStyle === 'square' ? 'active' : ''}" data-search="square">Soft square</button>
-            </div>
+            <div class="settings-accordion">
 
-            <div class="settings-label">Subs / Shorts / History buttons</div>
-            <div class="theme-options">
-              <button class="theme-pill ${(s.topnavStyle || 'text') === 'text' ? 'active' : ''}" data-topnav="text">Text</button>
-              <button class="theme-pill ${s.topnavStyle === 'icon' ? 'active' : ''}" data-topnav="icon">Icons only</button>
-              <button class="theme-pill ${s.topnavStyle === 'both' ? 'active' : ''}" data-topnav="both">Icon + label</button>
-            </div>
-
-            <div class="settings-label" style="margin-top:14px">Up next card style</div>
-            <div class="theme-options">
-              <button class="theme-pill" data-rmode="list">List</button>
-              <button class="theme-pill" data-rmode="overlay">Overlay</button>
-              <button class="theme-pill" data-rmode="thumbs">Thumbs only</button>
-            </div>
-
-            <div class="settings-label" style="margin-top:14px">Donate button</div>
-            <div id="donate-toggle-wrap">
-              ${s.hideDonateButton ? `
-                <button id="s-donate-show" class="theme-pill">Show donate button</button>
-                <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px">Currently hidden. Click to bring it back.</div>
-              ` : `
-                <button id="s-donate-hide-init" class="theme-pill">Hide donate button</button>
-                <div id="donate-confirm" class="donate-confirm" style="display:none">
-                  <div class="hint" style="font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0">
-                    To hide the donate button, type the following phrase exactly:
-                    <div style="font-family:monospace;color:var(--text);background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:6px;margin-top:6px;user-select:all;letter-spacing:0.4px">I HATE YOU AND DONT WANT TO GIVE YOU MONEY</div>
+              <div class="accordion-item open" data-acc="appearance">
+                <button type="button" class="accordion-head" aria-expanded="true">
+                  <svg class="accordion-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  <span>Appearance</span>
+                </button>
+                <div class="accordion-body">
+                  <div class="settings-label">Color</div>
+                  <div class="theme-options">${themeBtns}</div>
+                  <div class="settings-label">Background motion <span class="hint">(gradient only)</span></div>
+                  <div class="theme-options">
+                    <button class="theme-pill ${s.motion === 'still' ? 'active' : ''}" data-motion="still">Still</button>
+                    <button class="theme-pill ${s.motion === 'subtle' ? 'active' : ''}" data-motion="subtle">Subtle</button>
+                    <button class="theme-pill ${s.motion === 'lively' ? 'active' : ''}" data-motion="lively">Lively</button>
                   </div>
-                  <input type="text" id="s-donate-phrase" autocomplete="off" spellcheck="false" placeholder="Type the phrase…" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--text);font-family:monospace;font-size:12px;letter-spacing:0.4px;box-sizing:border-box" />
-                  <div id="s-donate-phrase-msg" class="hint" style="font-size:11px;color:#fca5a5;margin-top:6px;min-height:14px"></div>
+                  <label class="check-row">
+                    <input type="checkbox" id="s-glow" ${s.cardGlow ? 'checked' : ''} class="glass-check" />
+                    Card glow on hover
+                  </label>
                 </div>
-              `}
+              </div>
+
+              <div class="accordion-item" data-acc="components">
+                <button type="button" class="accordion-head" aria-expanded="false">
+                  <svg class="accordion-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  <span>Components</span>
+                </button>
+                <div class="accordion-body">
+                  <div class="settings-label">Search bar shape</div>
+                  <div class="theme-options">
+                    <button class="theme-pill ${s.searchStyle === 'pill' ? 'active' : ''}" data-search="pill">Pill</button>
+                    <button class="theme-pill ${s.searchStyle === 'square' ? 'active' : ''}" data-search="square">Soft square</button>
+                  </div>
+
+                  <div class="settings-label">Subs / Shorts / History buttons</div>
+                  <div class="theme-options">
+                    <button class="theme-pill ${(s.topnavStyle || 'text') === 'text' ? 'active' : ''}" data-topnav="text">Text</button>
+                    <button class="theme-pill ${s.topnavStyle === 'icon' ? 'active' : ''}" data-topnav="icon">Icons only</button>
+                    <button class="theme-pill ${s.topnavStyle === 'both' ? 'active' : ''}" data-topnav="both">Icon + label</button>
+                  </div>
+
+                  <div class="settings-label" style="margin-top:14px">Up next card style</div>
+                  <div class="theme-options">
+                    <button class="theme-pill" data-rmode="list">List</button>
+                    <button class="theme-pill" data-rmode="overlay">Overlay</button>
+                    <button class="theme-pill" data-rmode="thumbs">Thumbs only</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion-item" data-acc="donate">
+                <button type="button" class="accordion-head" aria-expanded="false">
+                  <svg class="accordion-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  <span>Donate button</span>
+                </button>
+                <div class="accordion-body">
+                  <div id="donate-toggle-wrap">
+                    ${s.hideDonateButton ? `
+                      <button id="s-donate-show" class="theme-pill">Show donate button</button>
+                      <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px">Currently hidden. Click to bring it back.</div>
+                    ` : `
+                      <button id="s-donate-hide-init" class="theme-pill">Hide donate button</button>
+                      <div id="donate-confirm" class="donate-confirm" style="display:none">
+                        <div class="hint" style="font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0">
+                          To hide the donate button, type the following phrase exactly:
+                          <div style="font-family:monospace;color:var(--text);background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:6px;margin-top:6px;user-select:all;letter-spacing:0.4px">I HATE YOU AND DONT WANT TO GIVE YOU MONEY</div>
+                        </div>
+                        <input type="text" id="s-donate-phrase" autocomplete="off" spellcheck="false" placeholder="Type the phrase…" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--text);font-family:monospace;font-size:12px;letter-spacing:0.4px;box-sizing:border-box" />
+                        <div id="s-donate-phrase-msg" class="hint" style="font-size:11px;color:#fca5a5;margin-top:6px;min-height:14px"></div>
+                      </div>
+                    `}
+                  </div>
+                </div>
+              </div>
+
             </div>
           </section>
         </div>
@@ -4995,6 +5023,21 @@ function showSettings() {
       const id = tab.dataset.tab;
       tabs.forEach(t => t.classList.toggle('active', t === tab));
       panes.forEach(p => p.classList.toggle('active', p.dataset.pane === id));
+    };
+  });
+
+  // --- Theme sub-section accordion (one open at a time) ---
+  const accItems = modalBody.querySelectorAll('.accordion-item');
+  accItems.forEach(item => {
+    const head = item.querySelector('.accordion-head');
+    if (!head) return;
+    head.onclick = () => {
+      const willOpen = !item.classList.contains('open');
+      accItems.forEach(other => {
+        const open = other === item && willOpen;
+        other.classList.toggle('open', open);
+        other.querySelector('.accordion-head')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
     };
   });
 
