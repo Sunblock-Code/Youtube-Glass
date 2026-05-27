@@ -2679,6 +2679,25 @@ async function renderVideo(id) {
   // Generation counter so a slow Subs fetch can't stomp on a tab the user
   // has since switched away from.
   let sourceGen = 0;
+  // When "Up next" comes back empty (commonly because YouTube bot-blocks the
+  // related endpoints), collapse the sidebar so the empty ~380px column isn't
+  // left as dead space — the video + comments reclaim the full width. If a
+  // later fetch actually finds videos we undo it. The flag tracks that WE
+  // collapsed it for emptiness, so we never fight a sidebar the user expanded.
+  let relatedAutoCollapsed = false;
+  const syncRelatedAutoCollapse = (isEmpty) => {
+    const pp = view.querySelector('.player-page');
+    if (!pp) return;
+    if (isEmpty && relatedSource === 'related') {
+      if (!pp.classList.contains('related-collapsed')) {
+        pp.classList.add('related-collapsed');
+        relatedAutoCollapsed = true;
+      }
+    } else if (relatedAutoCollapsed) {
+      pp.classList.remove('related-collapsed');
+      relatedAutoCollapsed = false;
+    }
+  };
   const renderSource = async (src) => {
     const gen = ++sourceGen;
     relatedSource = src;
@@ -2710,6 +2729,9 @@ async function renderVideo(id) {
       relatedListEl.innerHTML = items.length
         ? items.slice(0, 16).map(relatedRow).join('')
         : `<div class="empty-mini">No related videos</div>`;
+      // Collapse the sidebar if Up next is empty (no dead 380px column);
+      // re-expand if the fetch did turn up videos.
+      syncRelatedAutoCollapse(items.length === 0);
       bindRelatedRowClicks();
       return;
     }
@@ -2752,6 +2774,10 @@ async function renderVideo(id) {
   // of running the Piped fetchSidebarRelated fallback (which fills it, or
   // shows a "No related videos" message if that fails too).
   if (relatedSource !== 'related' || !((data.relatedStreams || []).length)) {
+    // No preloaded Up next data → collapse the sidebar up front so the empty
+    // column doesn't flash as a gap while we fetch; renderSource re-expands it
+    // if it finds videos.
+    if (relatedSource === 'related') syncRelatedAutoCollapse(true);
     renderSource(relatedSource);
   }
 
