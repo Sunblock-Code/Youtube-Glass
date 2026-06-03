@@ -585,6 +585,18 @@ ipcMain.handle('ytdlp:get-related', async (_e, videoId, limit) => {
   }
 });
 
+// YouTube watch-page sidebar recommendations (matches what youtube.com shows
+// for that video). Richer than the autoplay mix; preferred source for the
+// "Up next" tab.
+ipcMain.handle('ytdlp:get-recommendations', async (_e, videoId, limit) => {
+  try {
+    const items = await ytdlp.getRecommendations(videoId, limit);
+    return { ok: true, items };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
 ipcMain.handle('ytdlp:download', async (event, videoId, opts) => {
   try {
     const result = await ytdlp.downloadVideo(videoId, opts || {}, (p) => {

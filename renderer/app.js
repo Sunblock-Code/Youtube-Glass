@@ -3391,11 +3391,19 @@ async function fetchSidebarRelated(videoId, channelId) {
     }
   } catch {}
   let items = [];
-  // yt-dlp's autoplay mix (RD<id>) works over the local IP even when Piped's
-  // /streams is bot-blocked — the common case here, since this only runs when
-  // the yt-dlp video path already returned no related. Try it FIRST: Piped's
-  // instance sweep can hang ~2 min when every instance is blocked.
-  if (window.app?.ytdlp?.getRelated) {
+  // Primary: YouTube's actual watch-page sidebar recommendations (scraped from
+  // ytInitialData). This is the algorithm's full anonymous-user "Up next" list
+  // — varied content, way better than the autoplay mix alone.
+  if (window.app?.ytdlp?.getRecommendations) {
+    try {
+      const r = await window.app.ytdlp.getRecommendations(videoId, 20);
+      if (r && r.ok && Array.isArray(r.items)) items = r.items;
+    } catch {}
+  }
+  // Fallback 1: yt-dlp's autoplay mix (RD<id>). Narrower — basically a
+  // song-radio queue for that one video — but works when the watch-page
+  // scrape gets blocked.
+  if (!items.length && window.app?.ytdlp?.getRelated) {
     try {
       const r = await window.app.ytdlp.getRelated(videoId, 20);
       if (r && r.ok && Array.isArray(r.items)) items = r.items;
