@@ -2535,7 +2535,7 @@ input[type="checkbox"].glass-check:hover {
 input[type="checkbox"].glass-check:checked {
   background: var(--accent);
   border-color: transparent;
-  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.18);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 .picker-row input[type="checkbox"]:checked::after,
 input[type="checkbox"].glass-check:checked::after {
@@ -2672,8 +2672,8 @@ input[type="checkbox"].glass-check:checked::after {
 .settings-tab .dot {
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent);
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
   opacity: 0.45;
   transition: opacity 0.15s;
   flex: 0 0 auto;
@@ -2683,10 +2683,10 @@ input[type="checkbox"].glass-check:checked::after {
   border-color: rgba(255, 255, 255, 0.08);
 }
 .settings-tab.active {
-  background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(236, 72, 153, 0.10));
-  border-color: rgba(192, 132, 252, 0.40);
-  color: #fbcfe8;
-  text-shadow: 0 0 12px rgba(192, 132, 252, 0.25);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  text-shadow: none;
 }
 .settings-tab.active .dot { opacity: 1; }
 .settings-panes {
@@ -2719,18 +2719,18 @@ input[type="checkbox"].glass-check:checked::after {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1.8px;
-  color: #f5f0ff;
+  color: #f7f5fc;
   margin: 0 0 14px;
   display: flex;
   align-items: center;
   gap: 10px;
-  text-shadow: 0 0 12px rgba(192, 132, 252, 0.20);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.14);
 }
 .settings-section h3 .dot {
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
 }
 
 .settings-label {
@@ -2741,7 +2741,7 @@ input[type="checkbox"].glass-check:checked::after {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  color: #e9e4ff;
+  color: #eceaf2;
   margin: 14px 0 8px;
 }
 /* Settings value badge — small chip next to a slider showing the current
@@ -2758,7 +2758,7 @@ input[type="checkbox"].glass-check:checked::after {
   background: linear-gradient(135deg,
               rgba(0, 0, 0, 0.45) 0%,
               rgba(20, 12, 30, 0.55) 100%);
-  border: 1px solid var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: white;
   font-weight: 700;
   font-size: 11px;
@@ -2766,10 +2766,9 @@ input[type="checkbox"].glass-check:checked::after {
   text-transform: none;
   font-variant-numeric: tabular-nums;
   box-shadow:
-    0 0 0 1px var(--accent-soft),
-    0 0 10px var(--accent-soft),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  text-shadow: 0 0 6px var(--accent-soft);
+  text-shadow: none;
   transition: border-color 0.15s ease, box-shadow 0.2s ease;
 }
 .settings-label .hint,
