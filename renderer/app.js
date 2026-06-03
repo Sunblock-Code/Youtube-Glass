@@ -250,6 +250,9 @@ const DEFAULT_SETTINGS = {
   seeThrough: 0,      // % — how transparent the UI background is. Higher = more
                       // desktop showthrough (best paired with Mica/Acrylic backdrop)
   cardGlow: true,
+  roundedCorners: false, // round the whole app window's outer corners. Needs a
+                         // transparent window so the corner notches reveal the
+                         // desktop (handled at launch via launchedTransparent).
   material: 'none',   // 'none' | 'mica' | 'acrylic' | 'tabbed' | 'frosted'
   playbarStyle: 'glow', // 'none' | 'solid' | 'glow' | 'neon' | 'pulse' | 'rainbow'
   playbarColor: 'accent', // 'accent' | named colour key in PB_COLORS — ignored for 'none' & 'rainbow'
@@ -368,6 +371,7 @@ function applySettings(s) {
   // separate solid-colour picker. Pick a different theme to change it.
   root.style.setProperty('--bg-solid', t.bg || '#0a0612');
   root.dataset.glow = s.cardGlow ? 'true' : 'false';
+  root.dataset.corners = s.roundedCorners ? 'rounded' : 'square';
   root.dataset.scrollbars = s.hideScrollbars ? 'hidden' : 'visible';
   root.dataset.passbtn = s.hidePassButton ? 'hidden' : 'visible';
   root.dataset.donate = s.hideDonateButton ? 'hidden' : 'visible';
@@ -5003,6 +5007,14 @@ function showSettings() {
                     <input type="checkbox" id="s-glow" ${s.cardGlow ? 'checked' : ''} class="glass-check" />
                     Card glow on hover
                   </label>
+                  <label class="check-row">
+                    <input type="checkbox" id="s-rounded" ${s.roundedCorners ? 'checked' : ''} class="glass-check" />
+                    Rounded window corners
+                  </label>
+                  <div id="rounded-restart-note" class="settings-restart-note" style="display:none">
+                    Rounded corners need a restart to take effect (the window is recreated transparent so the corners can show the desktop).
+                    <button id="rounded-restart-btn" type="button">Restart now</button>
+                  </div>
                 </div>
               </div>
 
@@ -5234,6 +5246,31 @@ function showSettings() {
     };
   });
   modalBody.querySelector('#s-glow').onchange = (e) => update({ cardGlow: e.target.checked });
+  // Rounded window corners. The data-corners attr applies live (CSS), but the
+  // window only renders the corner notches as desktop when it was CREATED
+  // transparent. So if toggling this changes whether the window needs to be
+  // transparent (vs how it launched), prompt a restart — same pattern as the
+  // see-through bgMode toggle. In a see-through mode the window is already
+  // transparent, so turning rounded corners on/off there needs no restart.
+  {
+    const roundedToggle = modalBody.querySelector('#s-rounded');
+    const roundedNote = modalBody.querySelector('#rounded-restart-note');
+    const roundedRestartBtn = modalBody.querySelector('#rounded-restart-btn');
+    const launchedTransparent = !!(window.app && window.app.launchedTransparent);
+    const seeThroughModes = ['acrylic', 'clear', 'mica', 'gaussian'];
+    const refreshRoundedNote = () => {
+      if (!roundedNote) return;
+      const wantTransparent = seeThroughModes.includes(currentSettings.bgMode) || !!currentSettings.roundedCorners;
+      roundedNote.style.display = (wantTransparent !== launchedTransparent) ? '' : 'none';
+    };
+    if (roundedToggle) {
+      roundedToggle.onchange = (e) => { update({ roundedCorners: e.target.checked }); refreshRoundedNote(); };
+    }
+    if (roundedRestartBtn) {
+      roundedRestartBtn.onclick = () => { if (window.app && window.app.relaunchApp) window.app.relaunchApp(); };
+    }
+    refreshRoundedNote();
+  }
   // (The separate "Backdrop effect" material picker was removed — bgMode is
   //  the single see-through control now. Progress bar & Most Replayed
   //  handlers live on the player gear popover.)

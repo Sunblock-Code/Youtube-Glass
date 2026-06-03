@@ -61,6 +61,22 @@ body {
    phrase). The hate-text confirmation lives in the Theme tab. */
 :root[data-donate="hidden"] #donate-btn { display: none !important; }
 
+/* --- Rounded window corners (Settings → Theme → Appearance) ---
+   The whole app window's outer corners get a radius. The corner pixels are
+   painted by .bg (gradient/solid) or are already transparent (see-through);
+   either way the window is created transparent when this is on (see
+   launchedTransparent), so the rounded-off corner notches reveal the desktop
+   instead of a square fringe. We round the two layers that actually paint the
+   corners: .bg (full-viewport background) and the titlebar's top edge. 14px
+   matches the card/channel-row radius. */
+:root[data-corners="rounded"] .bg {
+  border-radius: 14px;
+}
+:root[data-corners="rounded"] .titlebar {
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+}
+
 /* --- Background gradient + blobs ---
    Sits above body's solid colour but BELOW interactive content via explicit
    positioning of titlebar/banner/main rather than relying on negative z-index

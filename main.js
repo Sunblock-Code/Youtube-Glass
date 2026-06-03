@@ -33,7 +33,12 @@ function readPersistedSettings() {
 const SEE_THROUGH_MODES = ['clear', 'acrylic', 'mica', 'gaussian'];
 const launchedTransparent = (() => {
   const s = readPersistedSettings();
-  return !!(s && SEE_THROUGH_MODES.includes(s.bgMode));
+  // Also transparent when the user has rounded corners on: the window must be
+  // transparent so the rounded-off corner notches reveal the desktop instead
+  // of square window-background fringe (works in opaque gradient/solid modes
+  // too). Transparency is fixed at creation, so toggling either needs a
+  // restart — the settings UI prompts for it.
+  return !!(s && (SEE_THROUGH_MODES.includes(s.bgMode) || s.roundedCorners));
 })();
 
 // Tell Windows this is a distinct app (separate from generic Electron) so the

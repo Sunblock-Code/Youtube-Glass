@@ -133,7 +133,7 @@ contextBridge.exposeInMainWorld('app', {
   // startup so this matches what it did; the renderer compares it to the
   // current bgMode to know when a restart is needed (crossing in/out of a
   // see-through mode, since window transparency is fixed at creation).
-  launchedTransparent: !!(_initialSettings && ['clear', 'acrylic', 'mica', 'gaussian'].includes(_initialSettings.bgMode)),
+  launchedTransparent: !!(_initialSettings && (['clear', 'acrylic', 'mica', 'gaussian'].includes(_initialSettings.bgMode) || _initialSettings.roundedCorners)),
   relaunchApp: () => ipcRenderer.invoke('app:relaunch'),
   toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
   maximize:       () => ipcRenderer.invoke('window:maximize'),
