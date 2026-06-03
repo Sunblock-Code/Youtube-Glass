@@ -1148,7 +1148,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .player-page.related-collapsed .related-header .section-title { display: none; }
 .player-page.related-collapsed .related { display: none; }
 .player-page.related-collapsed #related-layout { display: none !important; }
-.player-page.related-collapsed .related-header { justify-content: center; }
+/* Center the chevron in the collapsed sliver. Done for BOTH related and
+   comments so the two sides look symmetric — previously only the related
+   side got centred, leaving the comments-collapse chevron jammed at the
+   sliver's flex-start (= window-flush edge) and looking off-style. */
+.player-page.related-collapsed .related-header,
+.player-page.comments-collapsed .comments-header { justify-content: center; }
 .player-page.related-collapsed #related-toggle svg { transform: rotate(180deg); }
 
 .player-page.comments-collapsed .comments-header .section-title { display: none; }
