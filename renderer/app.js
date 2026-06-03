@@ -5999,7 +5999,9 @@ async function runInstall() {
   off();
 
   if (res.ok) {
+    const wasReady = ytdlpReady;
     ytdlpReady = true;
+    if (!wasReady) onYtdlpBecameReady();
     showBanner(`
       <div class="banner-text">
         <strong>yt-dlp installed.</strong>
@@ -6024,11 +6026,24 @@ async function runInstall() {
 async function checkYtdlp() {
   try {
     const s = await window.app.ytdlp.status();
+    const wasReady = ytdlpReady;
     ytdlpReady = !!s.installed;
     if (!ytdlpReady) showInstallPrompt();
+    else if (!wasReady) onYtdlpBecameReady();
   } catch (e) {
     console.warn('yt-dlp status check failed:', e);
   }
+}
+
+// yt-dlp just finished initialising. The dashboard fills its per-channel rows
+// from yt-dlp (Piped now returns channel videos under `tabs`, leaving
+// relatedStreams empty), but home/dashboard usually renders at BOOT — before
+// the async yt-dlp status check resolves — so the rows came up "No videos" and
+// never refreshed. If we're sitting on home when yt-dlp becomes ready,
+// re-render it so the channel rows fill in. (No-op anywhere else; the next
+// visit to home renders with yt-dlp already available.)
+function onYtdlpBecameReady() {
+  if (currentNav && currentNav.route === 'home') renderDashboard();
 }
 
 // ============================================================
