@@ -533,6 +533,8 @@ function recordWatch(item) {
   // Also keep a "last watched" pointer with thumbnail/title so we can prompt
   // to resume on next app launch.
   localStorage.setItem('glass-last-video', JSON.stringify({ ...item, savedAt: Date.now() }));
+  // Watching a video clears it from the queue ("saves until watched").
+  queueRemove(item.id);
 }
 function getLastVideo() {
   try { return JSON.parse(localStorage.getItem('glass-last-video') || 'null'); }
@@ -540,6 +542,75 @@ function getLastVideo() {
 }
 function clearLastVideo() { localStorage.removeItem('glass-last-video'); }
 function clearHistory() { localStorage.removeItem('glass-history'); }
+
+// ---------- Watch queue ----------
+// A persistent "watch later"-style queue. Right-click any video → Add to queue.
+// Survives app restarts (localStorage) and only drops an item when it's
+// actually watched (recordWatch) or the user removes it manually.
+const QUEUE_KEY = 'glass-queue';
+const QUEUE_LIMIT = 200;
+function getQueue() {
+  try { const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); return Array.isArray(q) ? q : []; }
+  catch { return []; }
+}
+function setQueue(q) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(0, QUEUE_LIMIT))); } catch {}
+  updateQueueBadges();
+}
+function isQueued(id) { return !!id && getQueue().some(v => v.id === id); }
+function queueAdd(item) {
+  if (!item || !item.id) return false;
+  const q = getQueue();
+  if (q.some(v => v.id === item.id)) return false; // no dupes
+  q.push({ ...item, queuedAt: Date.now() });
+  setQueue(q);
+  return true;
+}
+function queueRemove(id) {
+  if (!id) return;
+  const q = getQueue().filter(v => v.id !== id);
+  setQueue(q);
+}
+// Update any visible "Queue (N)" tab label + the topnav badge to the live count.
+function updateQueueBadges() {
+  const n = getQueue().length;
+  document.querySelectorAll('.related-tab[data-rt="queue"]').forEach(t => {
+    t.textContent = n ? `Queue (${n})` : 'Queue';
+  });
+}
+// Build a queue item from a video card / row DOM node (we don't always have the
+// original data object at right-click time, so read what the card shows).
+function queueItemFromEl(el) {
+  if (!el) return null;
+  const id = el.dataset.id;
+  if (!id) return null;
+  const q = (sel) => { const n = el.querySelector(sel); return n ? n.textContent.trim() : ''; };
+  const img = el.querySelector('.thumb img') || el.querySelector('img');
+  return {
+    id,
+    title: q('.title') || el.getAttribute('title') || '',
+    thumbnail: (img && (img.getAttribute('src') || '')) || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    durationText: q('.duration'),
+    uploaderName: q('.ch'),
+  };
+}
+// Row renderer for the Queue tab — mirrors relatedRow but uses the stored
+// durationText string and adds a remove (×) button.
+function queueRow(item) {
+  return `
+    <div class="row queue-row" data-id="${escapeAttr(item.id)}">
+      <div class="thumb">
+        <img src="${escapeAttr(item.thumbnail || '')}" loading="lazy" referrerpolicy="no-referrer" alt="" />
+        ${item.durationText ? `<div class="duration">${escape(item.durationText)}</div>` : ''}
+      </div>
+      <div class="info">
+        <div class="title">${escape(item.title || '')}</div>
+        <div class="sub"><span class="ch">${escape(item.uploaderName || '')}</span></div>
+      </div>
+      <button class="queue-row-del" type="button" data-qdel="${escapeAttr(item.id)}" title="Remove from queue" aria-label="Remove from queue">×</button>
+    </div>
+  `;
+}
 
 // ---------- Resume points ----------
 const RESUME_LIMIT = 200;
@@ -2424,6 +2495,7 @@ async function renderVideo(id) {
           <button class="related-tab ${relatedSource === 'related' ? 'active' : ''}" data-rt="related" role="tab">Up next</button>
           <button class="related-tab ${relatedSource === 'subs' ? 'active' : ''}" data-rt="subs" role="tab">Subs</button>
           <button class="related-tab ${relatedSource === 'history' ? 'active' : ''}" data-rt="history" role="tab">History</button>
+          <button class="related-tab ${relatedSource === 'queue' ? 'active' : ''}" data-rt="queue" role="tab">${getQueue().length ? `Queue (${getQueue().length})` : 'Queue'}</button>
         </div>
         <div class="related-header">
           <h2 class="section-title" id="related-active-label">${relatedSource === 'subs' ? 'Subs' : (relatedSource === 'history' ? 'History' : 'Up next')}</h2>
@@ -2839,7 +2911,30 @@ async function renderVideo(id) {
     });
     const labelEl = view.querySelector('#related-active-label');
     if (labelEl) {
-      labelEl.textContent = src === 'subs' ? 'Subs' : (src === 'history' ? 'History' : 'Up next');
+      labelEl.textContent = src === 'subs' ? 'Subs' : (src === 'history' ? 'History' : (src === 'queue' ? 'Queue' : 'Up next'));
+    }
+
+    if (src === 'queue') {
+      const items = getQueue();
+      relatedListEl.innerHTML = items.length
+        ? items.map(queueRow).join('')
+        : `<div class="empty-mini">Queue is empty. Right-click any video → Add to queue.</div>`;
+      // Wire row clicks (play) + per-row remove (×).
+      relatedListEl.querySelectorAll('.queue-row').forEach(r => {
+        r.querySelectorAll('img, .info, .thumb').forEach(() => {});
+        r.addEventListener('click', (e) => {
+          if (e.target.closest('.queue-row-del')) return; // remove button handled below
+          go('video', r.dataset.id);
+        });
+      });
+      relatedListEl.querySelectorAll('.queue-row-del').forEach(b => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          queueRemove(b.dataset.qdel);
+          renderSource('queue');
+        });
+      });
+      return;
     }
 
     if (src === 'related') {
@@ -3625,7 +3720,7 @@ function renderCommentList(items, list, sort) {
         </div>
         <div class="comment-text">${sanitizeDescription(c.commentText || '')}</div>
         <div class="comment-stats">
-          ${c.likeCount != null ? `${fmtNumber(c.likeCount)} likes` : ''}${c.replyCount ? ` · ${c.replyCount} replies` : ''}
+          ${c.likeCount != null ? `<span><b>${fmtNumber(c.likeCount)}</b> likes</span>` : ''}${c.replyCount ? `<span class="comment-stats-sep">·</span><span><b>${fmtNumber(c.replyCount)}</b> replies</span>` : ''}
         </div>
       </div>
     </div>
@@ -6655,3 +6750,58 @@ function wireChatPanel() {
 // somewhere other than a video page. Querying the DOM at fire time
 // means we don't have to manage subscription lifecycles per-render.
 watchParty.addEventListener('state', refreshChatVisibility);
+
+// ---------- Right-click video → context menu (Play / Add to queue) ----------
+const VIDEO_CARD_SEL = '.card[data-id], .row[data-id], .dash-row[data-id], .widget-history-card[data-id], .shorts-card[data-id]';
+let _videoCtxMenu = null;
+function hideVideoContextMenu() {
+  if (_videoCtxMenu) { _videoCtxMenu.remove(); _videoCtxMenu = null; }
+}
+function showVideoContextMenu(x, y, item) {
+  hideVideoContextMenu();
+  const queued = isQueued(item.id);
+  const menu = document.createElement('div');
+  menu.className = 'video-context-menu';
+  menu.innerHTML = `
+    <button type="button" data-act="play">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20"/></svg>
+      Play now
+    </button>
+    <button type="button" data-act="queue">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${queued
+        ? '<line x1="5" y1="12" x2="19" y2="12"/>'
+        : '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'}</svg>
+      ${queued ? 'Remove from queue' : 'Add to queue'}
+    </button>
+  `;
+  document.body.appendChild(menu);
+  // Clamp to the viewport so it never opens off-screen.
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 8)) + 'px';
+  menu.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 8)) + 'px';
+  menu.querySelector('[data-act="play"]').onclick = () => { hideVideoContextMenu(); go('video', item.id); };
+  menu.querySelector('[data-act="queue"]').onclick = () => {
+    if (isQueued(item.id)) queueRemove(item.id); else queueAdd(item);
+    // If the Queue tab is currently visible, refresh it so the change shows.
+    const activeTab = document.querySelector('.related-tab.active');
+    if (activeTab && activeTab.dataset.rt === 'queue') {
+      document.querySelector('.related-tab[data-rt="queue"]')?.click();
+    }
+    hideVideoContextMenu();
+  };
+  _videoCtxMenu = menu;
+}
+document.addEventListener('contextmenu', (e) => {
+  const el = e.target.closest && e.target.closest(VIDEO_CARD_SEL);
+  if (!el) { hideVideoContextMenu(); return; }
+  const item = queueItemFromEl(el);
+  if (!item || !item.id) return;
+  e.preventDefault();
+  showVideoContextMenu(e.clientX, e.clientY, item);
+});
+document.addEventListener('click', hideVideoContextMenu);
+document.addEventListener('scroll', hideVideoContextMenu, true);
+window.addEventListener('blur', hideVideoContextMenu);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideVideoContextMenu(); });
+// Initialise the Queue tab badge from persisted state on boot.
+updateQueueBadges();
