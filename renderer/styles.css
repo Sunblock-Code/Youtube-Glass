@@ -1481,7 +1481,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   outline: none;
   padding: 2px 0;
 }
-.comment-composer textarea::placeholder { color: var(--muted); }
+.comment-composer textarea::placeholder { color: rgba(255, 255, 255, 0.7); } /* neutral white, matches the search placeholder (was var(--muted) purple-grey) */
 .comment-composer-actions {
   display: none;
   align-items: center;
