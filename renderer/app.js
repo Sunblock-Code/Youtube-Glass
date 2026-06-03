@@ -5126,6 +5126,10 @@ document.getElementById('home-btn').onclick = () => go('home');
   // class on the button (CSS shows the right glyph) rather than the SVG's
   // .hidden property, which SVGElement doesn't implement.
   const setMaxUI = (isMax) => {
+    // Square the window corners while maximized (see the rounded-corners CSS):
+    // a maximized window with a radius would show desktop notches at the screen
+    // corners. Toggle this before the maxBtn guard so it always runs.
+    document.body.classList.toggle('win-maximized', !!isMax);
     if (!maxBtn) return;
     maxBtn.classList.toggle('is-max', !!isMax);
     maxBtn.title = isMax ? 'Restore' : 'Maximize';

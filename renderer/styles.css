@@ -62,19 +62,27 @@ body {
 :root[data-donate="hidden"] #donate-btn { display: none !important; }
 
 /* --- Rounded window corners (Settings → Theme → Appearance) ---
-   The whole app window's outer corners get a radius. The corner pixels are
-   painted by .bg (gradient/solid) or are already transparent (see-through);
-   either way the window is created transparent when this is on (see
+   Rounds the WHOLE app window. Two layers paint window-edge pixels, so both
+   need the radius:
+   • body — its content rows (titlebar / banner / main) are position:relative
+     in-flow grid items, and body already has overflow:hidden + height:100%, so
+     a radius on body CLIPS all of them. That's what rounds all four corners,
+     including the bottom ones painted by `main` (those stayed square before —
+     the old rule only rounded .bg + the titlebar's top edge).
+   • .bg — position:fixed, so it escapes body's overflow clip and needs its own
+     matching radius.
+   The window is created transparent whenever this is on (see
    launchedTransparent), so the rounded-off corner notches reveal the desktop
-   instead of a square fringe. We round the two layers that actually paint the
-   corners: .bg (full-viewport background) and the titlebar's top edge. 14px
-   matches the card/channel-row radius. */
+   instead of a square fringe. Squared off while maximized (matches Windows and
+   avoids desktop notches at the screen corners). 14px matches the
+   card/channel-row radius. */
+:root[data-corners="rounded"] body,
 :root[data-corners="rounded"] .bg {
   border-radius: 14px;
 }
-:root[data-corners="rounded"] .titlebar {
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
+:root[data-corners="rounded"] body.win-maximized,
+:root[data-corners="rounded"] body.win-maximized .bg {
+  border-radius: 0;
 }
 
 /* --- Background gradient + blobs ---
