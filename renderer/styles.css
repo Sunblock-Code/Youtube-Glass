@@ -387,17 +387,23 @@ body {
   -webkit-font-smoothing: antialiased;
   padding-right: 4px;
   padding-top: 2px;                     /* optical centering vs logo */
-  /* Static layered glow underneath; the animation only varies a single
-     drop-shadow filter (GPU-composited, no paint stutter). */
+  /* Static layered WHITE glow underneath; the animation only varies a single
+     drop-shadow filter (GPU-composited, no paint stutter). Section titles
+     (COMMENTS / UP NEXT) keep their lavender brandGlow — only the titlebar
+     wordmark uses the white variant. */
   text-shadow:
-    0 0 10px rgba(216, 180, 254, 0.45),
-    0 0 26px rgba(168,  85, 247, 0.25);
+    0 0 10px rgba(255, 255, 255, 0.50),
+    0 0 26px rgba(255, 255, 255, 0.28);
   will-change: filter;
-  animation: brandGlow 5s ease-in-out infinite;
+  animation: brandGlowWhite 5s ease-in-out infinite;
 }
 @keyframes brandGlow {
   0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.30)); }
   50%      { filter: drop-shadow(0 0 12px rgba(216, 180, 254, 0.65)); }
+}
+@keyframes brandGlowWhite {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.35)); }
+  50%      { filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.70)); }
 }
 
 /* Allow brand to be wider since it now needs more room.
@@ -4059,14 +4065,18 @@ body.dragging-panel * { cursor: grabbing !important; }
 .title-row .stats {
   flex-shrink: 0;
   white-space: nowrap;
-  font-size: 13px;
-  color: var(--muted);
+  /* Bumped 13 → 14 + brighter labels + a small text-shadow so the strip lifts
+     off the see-through background — same trick the search box uses. */
+  font-size: 14px;
+  color: #c9c3df;
   padding-top: 8px;
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 9px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.005em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  -webkit-font-smoothing: antialiased;
 }
 .title-row .stats .stat b {
   color: var(--text);
@@ -4074,10 +4084,10 @@ body.dragging-panel * { cursor: grabbing !important; }
   margin-right: 3px;
 }
 .title-row .stats .stat-time {
-  opacity: 0.85;
+  opacity: 0.92;
 }
 .title-row .stats .stat-sep {
-  opacity: 0.35;
+  opacity: 0.45;
   font-weight: 400;
   user-select: none;
 }
