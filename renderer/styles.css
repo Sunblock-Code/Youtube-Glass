@@ -544,8 +544,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 #search::placeholder {
-  color: #e0d9f3;
-  opacity: 0.85;
+  color: rgba(255, 255, 255, 0.7);  /* neutral white, was a lavender #e0d9f3 */
+  opacity: 1;
   font-weight: 500;
   letter-spacing: 0.1px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -571,7 +571,7 @@ body {
     0 8px 24px rgba(192, 132, 252, 0.20),
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-#search:focus::placeholder { color: rgba(192, 132, 252, 0.5); }
+#search:focus::placeholder { color: rgba(255, 255, 255, 0.55); }
 
 /* Search shape variant: soft square */
 :root[data-search="square"] #search { border-radius: 12px; }
