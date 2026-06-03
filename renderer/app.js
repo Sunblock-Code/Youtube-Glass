@@ -602,6 +602,7 @@ function queueRow(item) {
       <div class="thumb">
         <img src="${escapeAttr(item.thumbnail || '')}" loading="lazy" referrerpolicy="no-referrer" alt="" />
         ${item.durationText ? `<div class="duration">${escape(item.durationText)}</div>` : ''}
+        ${watchProgressHtml(item.id)}
       </div>
       <div class="info">
         <div class="title">${escape(item.title || '')}</div>
@@ -3458,6 +3459,17 @@ async function renderChannel(id) {
 }
 
 // ---------- Card templates ----------
+// Thin "how much watched" bar along the bottom of a thumbnail (like YouTube's).
+// Reads the saved resume point (position / duration) for this video id; renders
+// nothing if the video hasn't been watched or we don't know its length.
+function watchProgressHtml(id) {
+  const r = getResume(id);
+  if (!r || !r.duration || r.duration <= 0 || !r.position) return '';
+  const pct = Math.max(0, Math.min(100, (r.position / r.duration) * 100));
+  if (pct < 1) return '';
+  return `<div class="watch-progress"><div class="watch-progress-fill" style="width:${pct.toFixed(1)}%"></div></div>`;
+}
+
 function videoCard(item) {
   const id = videoIdFromUrl(item.url);
   return `
@@ -3465,6 +3477,7 @@ function videoCard(item) {
       <div class="thumb">
         <img src="${escapeAttr(item.thumbnail || '')}" loading="lazy" referrerpolicy="no-referrer" alt="" />
         <div class="duration">${fmtDuration(item.duration)}</div>
+        ${watchProgressHtml(id)}
       </div>
       <div class="meta">
         <div class="title">${escape(item.title || '')}</div>
@@ -3589,6 +3602,7 @@ function relatedRow(item) {
       <div class="thumb">
         <img src="${escapeAttr(item.thumbnail || '')}" loading="lazy" referrerpolicy="no-referrer" alt="" />
         <div class="duration">${fmtDuration(item.duration)}</div>
+        ${watchProgressHtml(id)}
       </div>
       <div class="info">
         <div class="title">${escape(item.title || '')}</div>
@@ -4410,6 +4424,9 @@ async function downloadCurrentVideo(id) {
   if (result.ok) {
     const fname = result.filename ? result.filename.replace(/^.*[\\/]/, '') : '';
     showBanner(`
+      <span class="banner-icon" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12.5 11 15.5 16 9"/></svg>
+      </span>
       <div class="banner-text">
         <strong>Download complete.</strong>
         <span>${escape(fname || 'Saved to your Downloads folder.')}</span>
@@ -6797,9 +6814,20 @@ document.addEventListener('contextmenu', (e) => {
   const item = queueItemFromEl(el);
   if (!item || !item.id) return;
   e.preventDefault();
+  e.stopPropagation();
   showVideoContextMenu(e.clientX, e.clientY, item);
 });
-document.addEventListener('click', hideVideoContextMenu);
+// Capture-phase: while the menu is open, the dismiss click must NOT also reach
+// the video card behind it (that was navigating to the video on right-click →
+// click-away). Swallow any click outside the menu, then close it. Clicks on
+// the menu's own buttons (.video-context-menu) pass through to their handlers.
+document.addEventListener('click', (e) => {
+  if (!_videoCtxMenu) return;
+  if (e.target.closest && e.target.closest('.video-context-menu')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  hideVideoContextMenu();
+}, true);
 document.addEventListener('scroll', hideVideoContextMenu, true);
 window.addEventListener('blur', hideVideoContextMenu);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideVideoContextMenu(); });

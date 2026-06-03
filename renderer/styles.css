@@ -1687,6 +1687,27 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .queue-row:hover .queue-row-del { opacity: 1; }
 .queue-row-del:hover { color: #f87171; background: rgba(248, 113, 113, 0.12); }
 
+/* "How much watched" bar along the bottom of a thumbnail (like YouTube's red
+   bar, but in the theme accent). Rendered by watchProgressHtml() into .thumb,
+   which is already position:relative (the duration badge sits in it). */
+.thumb .watch-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 2;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  overflow: hidden;
+}
+.thumb .watch-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
 /* Sticky wrapper for the sidebar's tab row (Up next / Subs / History) plus
    the active-label header. Keeps those top items pinned instead of scrolling
    away with the list. Background stays TRANSPARENT so the Up next / Subs /
@@ -4600,12 +4621,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-transform: uppercase;
   letter-spacing: 6px;
   line-height: 1;
-  color: #e9d5ff;
+  /* Text + glow now follow the active theme accent (via color-mix) instead of
+     a hardcoded lavender, so LOADING matches whatever theme is set. */
+  color: var(--accent);
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
   text-shadow:
-    0 0 10px rgba(216, 180, 254, 0.50),
-    0 0 26px rgba(168, 85, 247, 0.30);
+    0 0 10px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 26px color-mix(in srgb, var(--accent) 25%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4626,8 +4649,8 @@ body.dragging-panel * { cursor: grabbing !important; }
   will-change: transform, box-shadow;
 }
 @keyframes loaderGlow {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.30)); }
-  50%      { filter: drop-shadow(0 0 14px rgba(216, 180, 254, 0.70)); }
+  0%, 100% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 30%, transparent)); }
+  50%      { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 55%, transparent)); }
 }
 @keyframes loaderOrb {
   0%, 100% {
@@ -5295,10 +5318,22 @@ body.dragging-panel * { cursor: grabbing !important; }
 .install-banner .banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .install-banner .banner-text strong { font-size: 14px; font-weight: 700; color: var(--text); }
 .install-banner .banner-text span {
+  /* Bumped from a dim 0.78 alpha so the filename/details line is properly
+     legible — it was washing out against the banner tint. */
   font-size: 13px;
-  color: rgba(236, 230, 255, 0.78);  /* brighter than --muted but still subdued vs the bold heading */
-  font-weight: 400;
+  color: #ece6ff;
+  font-weight: 500;
+  word-break: break-word;
 }
+/* Status icon (e.g. the green check on "Download complete") */
+.install-banner .banner-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.install-banner.success .banner-icon { color: #4ade80; }
+.install-banner.error .banner-icon { color: #f472b6; }
 .install-banner button {
   height: 34px; padding: 0 18px;
   border-radius: 17px;
