@@ -986,12 +986,16 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to left, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  /* Match the channel-row / description glass aesthetic — same --glass fill,
+     same --glass-border outline, same --blur backdrop. Drops the custom heavy
+     gradient + drop-shadow that made the sliver feel detached from the rest
+     of the page. */
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   cursor: pointer;
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease;
   padding: 0;
   height: calc(100vh - 80px);
   min-height: 110px;
@@ -999,32 +1003,26 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 
 .player-page.related-collapsed > .related-col {
   border-right: none;
-  border-radius: 16px 0 0 16px;
+  /* Same 14px corner radius as .channel-row; right side stays square because
+     the sliver is flush against the window edge (see negative margin). */
+  border-radius: 14px 0 0 14px;
   /* Extend past main's 40px right padding so the sliver sits flush against
      the window's right edge — same trick on the left for the comments tab. */
   margin-right: -40px;
-  background: linear-gradient(to left, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
-  box-shadow:
-    -6px 0 24px rgba(0, 0, 0, 0.45),
-    inset -1px 0 0 rgba(255, 255, 255, 0.06);
 }
 .player-page.related-collapsed > .related-col:hover {
-  background: linear-gradient(to left, rgba(192, 132, 252, 0.22), rgba(20, 12, 30, 0.65));
-  border-color: rgba(192, 132, 252, 0.45);
+  background: var(--glass-strong);
+  border-color: var(--accent-soft);
 }
 
 .player-page.comments-collapsed:not([data-cmode-below]) > .comments-col {
   border-left: none;
-  border-radius: 0 16px 16px 0;
+  border-radius: 0 14px 14px 0;
   margin-left: -40px;     /* clear main's 40px left padding → flush to window edge */
-  background: linear-gradient(to right, rgba(20, 12, 30, 0.92), rgba(20, 12, 30, 0.62));
-  box-shadow:
-    6px 0 24px rgba(0, 0, 0, 0.45),
-    inset 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 .player-page.comments-collapsed:not([data-cmode-below]) > .comments-col:hover {
-  background: linear-gradient(to right, rgba(192, 132, 252, 0.22), rgba(20, 12, 30, 0.65));
-  border-color: rgba(192, 132, 252, 0.45);
+  background: var(--glass-strong);
+  border-color: var(--accent-soft);
 }
 
 /* --- BELOW-MODE DROPDOWN (when comments lives below the player) ---
