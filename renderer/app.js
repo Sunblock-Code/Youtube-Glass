@@ -2369,7 +2369,7 @@ async function renderVideo(id) {
         <div class="player-wrap" id="player-wrap">
           <video autoplay playsinline></video>
           <div class="cc-subs" id="cc-subs" aria-hidden="true"></div>
-          <div class="player-spinner" aria-hidden="true"><div class="player-spinner-ring"></div></div>
+          <div class="player-spinner" aria-hidden="true"><div class="player-spinner-ring"></div><div class="player-spinner-label">Buffering…</div></div>
           <div class="player-bottom-fade"></div>
           <div class="player-heatmap" id="player-heatmap"></div>
           <div class="player-progress-strip">
@@ -2810,10 +2810,53 @@ async function renderVideo(id) {
   };
   pbRafId = requestAnimationFrame(updatePb);
 
-  // Buffering visual: pulse the strip so the user has feedback that the
-  // player isn't dead, just waiting on bytes. waiting/stalled add the class,
-  // playing/canplay/seeked clear it.
-  const onWaiting = () => playerWrapEl?.classList.add('buffering');
+  // --- Auto-lower quality when the connection is struggling ---
+  // Only the progressive (video-only + sidecar audio) path needs this — hls.js
+  // and dash.js adapt bitrate on their own. We watch stall frequency: if the
+  // video stalls STALL_TRIGGER times within STALL_WINDOW, step down to the next
+  // lower video stream and tell the user briefly. Skipped once the user picks a
+  // quality by hand (v._manualQuality), so we never fight a manual choice.
+  const _vStreams = (data.videoStreams || [])
+    .filter(s => s.url && s.videoOnly)
+    .sort((a, b) => (parseInt(b.quality) || 0) - (parseInt(a.quality) || 0));
+  let _curQ = 0;                 // index of the currently-playing quality (0 = highest)
+  let _stallTimes = [];
+  const STALL_WINDOW = 25000, STALL_TRIGGER = 3;
+  const canAutoDowngrade = () => !v._hls && !v._dash && !v._manualQuality
+    && data.audioStream && _vStreams.length > 1;
+  const autoDowngrade = () => {
+    if (!canAutoDowngrade() || _curQ >= _vStreams.length - 1) return;
+    _curQ++;
+    const s = _vStreams[_curQ];
+    _stallTimes = [];
+    // attachAudioSync preserves the current time + play state internally.
+    playerLib.attachAudioSync(v, s.url, data.audioStream.url);
+    showBanner(`
+      <span class="banner-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-8"/><polyline points="8 16 12 20 16 16"/><path d="M4 8a8 8 0 0 1 16 0"/></svg>
+      </span>
+      <div class="banner-text">
+        <strong>Lowered quality to ${escape(s.quality || 'a lower setting')}</strong>
+        <span>Your connection was struggling to keep up. Pick a higher quality from the player gear any time.</span>
+      </div>
+      <button id="aq-close" class="topnav-style-btn">OK</button>
+    `, 'success');
+    const c = banner.querySelector('#aq-close');
+    if (c) c.onclick = clearBanner;
+    setTimeout(clearBanner, 7000);
+  };
+
+  // Buffering visual: dim scrim + spinner + "Buffering…" so the wait is
+  // unmistakable (it reads as paused-loading, not a frozen frame). waiting/
+  // stalled add the class + feed the stall counter; playing/canplay/seeked
+  // clear it.
+  const onWaiting = () => {
+    playerWrapEl?.classList.add('buffering');
+    const now = Date.now();
+    _stallTimes.push(now);
+    _stallTimes = _stallTimes.filter(t => now - t < STALL_WINDOW);
+    if (_stallTimes.length >= STALL_TRIGGER) autoDowngrade();
+  };
   const onResumed = () => playerWrapEl?.classList.remove('buffering');
   v.addEventListener('waiting', onWaiting);
   v.addEventListener('stalled', onWaiting);
@@ -4179,6 +4222,8 @@ function attachCustomControls(v, root, data = {}) {
           activeId = id;
           const s = streams[Number(id)];
           if (!s) return;
+          // User picked a quality by hand — stop auto-downgrade from overriding it.
+          v._manualQuality = true;
           const t = v.currentTime;
           const wasPlaying = !v.paused;
           if (s.videoOnly && data.audioStream) {

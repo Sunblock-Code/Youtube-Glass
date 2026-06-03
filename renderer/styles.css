@@ -1635,12 +1635,16 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--glass-strong, rgba(20, 12, 30, 0.95));
-  border: 1px solid var(--glass-border-strong, rgba(255, 255, 255, 0.16));
+  /* Fixed near-opaque dark fill (NOT --glass-strong): in see-through modes
+     that var goes low-alpha AND backdrop-filter is force-disabled, which left
+     the menu transparent and unreadable. A solid dark base + heavier blur
+     keeps it crisp and legible over any background. */
+  background: rgba(16, 11, 26, 0.97);
+  border: 1px solid var(--glass-border-strong, rgba(255, 255, 255, 0.18));
   border-radius: 12px;
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  box-shadow: 0 18px 44px -12px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(60px) saturate(160%);
+  -webkit-backdrop-filter: blur(60px) saturate(160%);
+  box-shadow: 0 18px 44px -12px rgba(0, 0, 0, 0.7);
   animation: ctxMenuIn 0.12s ease-out;
 }
 @keyframes ctxMenuIn {
@@ -3933,12 +3937,17 @@ body.dragging-panel * { cursor: grabbing !important; }
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.18s ease;
   z-index: 5;
+  /* Dim scrim so buffering reads as a clear "paused, loading" state over the
+     frozen frame instead of a faint ring you have to squint for. */
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.32) 55%, rgba(0, 0, 0, 0.12) 100%);
 }
 .player-wrap.buffering .player-spinner {
   opacity: 1;
@@ -3951,7 +3960,15 @@ body.dragging-panel * { cursor: grabbing !important; }
   border: 3px solid rgba(255, 255, 255, 0.18);
   border-top-color: var(--accent);
   animation: playerSpin 0.9s linear infinite;
-  filter: drop-shadow(0 0 14px rgba(192, 132, 252, 0.45));
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 50%, transparent));
+}
+.player-spinner-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
 /* Pause the spin animation when hidden so we don't waste paint cycles. */
 .player-wrap:not(.buffering) .player-spinner-ring { animation-play-state: paused; }
