@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, shell, ipcMain, globalShortcut, screen, dialog } = require('electron');
+const { app, BrowserWindow, WebContentsView, session, shell, ipcMain, globalShortcut, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -90,11 +90,6 @@ function createWindow() {
       // audio-sync drift loop. Disabling background throttling lets audio
       // keep playing while the window is tucked away and keeps A/V aligned.
       backgroundThrottling: false,
-      // Enables the <webview> tag, used ONLY for the docked Watch2Gether room
-      // panel (renderer/app.js renderW2G). The guest page runs sandboxed with
-      // no Node access; the search box only routes w2g.tv hosts into it, so
-      // this is not a general "embed any site" browser.
-      webviewTag: true,
     },
   });
 
@@ -108,6 +103,10 @@ function createWindow() {
   };
   mainWindow.on('maximize', sendMaxState);
   mainWindow.on('unmaximize', sendMaxState);
+  // The w2g WebContentsView is a child of this window's contentView, so it's
+  // torn down with the window — drop our reference so a recreated window
+  // doesn't try to reuse an orphaned view.
+  mainWindow.on('closed', () => { w2gView = null; });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
@@ -124,6 +123,217 @@ app.whenReady().then(() => {
 ipcMain.handle('open-external', (_e, url) => {
   if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
 });
+
+// ---- Watch2Gether embed (WebContentsView) ----------------------------------
+// A docked real web-view (same engine as the main window — plays media where
+// the <webview> tag didn't). After every navigation we inject JS into the
+// guest to fullscreen the player iframe/video and hide w2g's surrounding UI,
+// so the user only sees the video. Scoped to w2g.tv: top-level navigation
+// elsewhere and popups are routed to the real browser, keeping this a w2g
+// view, not a general embedded browser.
+let w2gView = null;
+function isW2gHost(u) {
+  try { const h = new URL(u).hostname.toLowerCase(); return h === 'w2g.tv' || h.endsWith('.w2g.tv'); }
+  catch { return false; }
+}
+// JS injected into the guest. Finds the player iframe (YouTube/Vimeo/etc.) or
+// a raw <video>, walks up its ancestor chain hiding siblings at every level so
+// the surrounding w2g UI/chat/ads disappear, then forces the player to fill
+// the viewport. A MutationObserver re-runs the logic if w2g rebuilds the DOM
+// (it loads the player asynchronously). If there's no player (an unsupported
+// source — e.g., a content type w2g can't play natively), an overlay says so.
+const W2G_JUST_VIDEO_JS = `
+(function () {
+  if (window.__glassW2g) return; window.__glassW2g = true;
+  // Provider iframes are the ACTUAL player for almost everything w2g plays
+  // (YouTube/Vimeo/Dailymotion/SoundCloud/Twitch). w2g also has a stray empty
+  // <video> element on the page for sync bookkeeping — we used to grab it
+  // first and fullscreen an empty player with no source. Always prefer a
+  // real provider iframe; fall back to a <video> ONLY if it has a source AND
+  // a meaningful size, to dodge the empty bookkeeping element.
+  const PROVIDER_IFRAME_SEL = [
+    'iframe[src*="youtube"]', 'iframe[src*="youtube-nocookie"]', 'iframe[src*="youtu.be"]',
+    'iframe[src*="vimeo"]', 'iframe[src*="dailymotion"]',
+    'iframe[src*="soundcloud"]', 'iframe[src*="twitch"]', 'iframe[src*="player.twitch"]',
+  ].join(', ');
+  const setImp = (el, prop, val) => { try { el.style.setProperty(prop, val, 'important'); } catch (e) {} };
+  function iframeRealSrc(f) {
+    const s = f.src || f.getAttribute('data-src') || '';
+    return /^https?:\\//.test(s) && !/about:blank/i.test(s) ? s : '';
+  }
+  function findPlayer() {
+    // Tier 1: known provider iframes by host substring (with a real src).
+    for (const f of document.querySelectorAll(PROVIDER_IFRAME_SEL)) {
+      if (iframeRealSrc(f)) return f;
+    }
+    // Tier 2: largest iframe on the page with a real src. Catches providers
+    // we didn't list explicitly. Skip tiny iframes (ads / trackers).
+    let bestIf = null, bestIfArea = 0;
+    for (const f of document.querySelectorAll('iframe')) {
+      if (!iframeRealSrc(f)) continue;
+      const r = f.getBoundingClientRect();
+      const a = Math.max(0, r.width) * Math.max(0, r.height);
+      if (a < 50000) continue;
+      if (a > bestIfArea) { bestIfArea = a; bestIf = f; }
+    }
+    if (bestIf) return bestIf;
+    // Tier 3: largest <video> with a source — skips empty sync placeholders.
+    let bestV = null, bestVArea = 0;
+    for (const v of document.querySelectorAll('video')) {
+      if (!v.src && !v.currentSrc) continue;
+      const r = v.getBoundingClientRect();
+      const a = Math.max(0, r.width) * Math.max(0, r.height);
+      if (a >= bestVArea) { bestVArea = a; bestV = v; }
+    }
+    return bestV;
+  }
+  function styleHost() {
+    setImp(document.documentElement, 'background', '#000');
+    setImp(document.documentElement, 'margin', '0');
+    setImp(document.documentElement, 'padding', '0');
+    setImp(document.documentElement, 'overflow', 'hidden');
+    setImp(document.body, 'background', '#000');
+    setImp(document.body, 'margin', '0');
+    setImp(document.body, 'padding', '0');
+    setImp(document.body, 'overflow', 'hidden');
+  }
+  function hideAround(player) {
+    let el = player;
+    while (el && el !== document.body) {
+      const parent = el.parentElement;
+      if (!parent) break;
+      for (const sib of Array.from(parent.children)) {
+        if (sib !== el) setImp(sib, 'display', 'none');
+      }
+      setImp(parent, 'position', 'static');
+      setImp(parent, 'width', '100%');
+      setImp(parent, 'height', '100%');
+      setImp(parent, 'margin', '0');
+      setImp(parent, 'padding', '0');
+      setImp(parent, 'background', '#000');
+      el = parent;
+    }
+    setImp(player, 'position', 'fixed');
+    setImp(player, 'top', '0');
+    setImp(player, 'left', '0');
+    setImp(player, 'width', '100vw');
+    setImp(player, 'height', '100vh');
+    setImp(player, 'border', '0');
+    setImp(player, 'margin', '0');
+    setImp(player, 'background', '#000');
+    setImp(player, 'z-index', '2147483647');
+    setImp(player, 'display', 'block');
+  }
+  function noVideoDebugLine() {
+    const ifrs = Array.from(document.querySelectorAll('iframe')).filter(f => iframeRealSrc(f));
+    const vids = Array.from(document.querySelectorAll('video')).filter(v => v.src || v.currentSrc);
+    const ifrInfo = ifrs.map(f => {
+      let host = '?';
+      try { host = new URL(iframeRealSrc(f)).hostname.replace(/^www\\./, ''); } catch (e) {}
+      const r = f.getBoundingClientRect();
+      return host + ' ' + Math.round(r.width) + '\\u00d7' + Math.round(r.height);
+    });
+    const vidInfo = vids.map(v => {
+      const r = v.getBoundingClientRect();
+      return Math.round(r.width) + '\\u00d7' + Math.round(r.height);
+    });
+    return 'iframes(' + ifrs.length + '): ' + (ifrInfo.join('; ') || 'none')
+         + ' \\u00b7 videos(' + vids.length + '): ' + (vidInfo.join('; ') || 'none');
+  }
+  function showNoVideo() {
+    const dbgText = noVideoDebugLine();
+    let ov = document.getElementById('__glass_no_video');
+    if (ov) {
+      const dbg = ov.querySelector('.__glass_dbg');
+      if (dbg) dbg.textContent = dbgText;
+      return;
+    }
+    ov = document.createElement('div');
+    ov.id = '__glass_no_video';
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;color:#9b94b3;display:flex;flex-direction:column;align-items:center;justify-content:center;font:14px system-ui,sans-serif;text-align:center;padding:24px;z-index:2147483647;gap:10px;';
+    const main = document.createElement('div');
+    main.textContent = 'No video playing in this room (or the source isn\\u2019t one w2g can play natively).';
+    const dbg = document.createElement('div');
+    dbg.className = '__glass_dbg';
+    dbg.style.cssText = 'font:11px ui-monospace,Consolas,monospace;color:#6b6580;opacity:0.75;';
+    dbg.textContent = dbgText;
+    ov.append(main, dbg);
+    document.body.appendChild(ov);
+  }
+  function clearNoVideo() {
+    const ov = document.getElementById('__glass_no_video');
+    if (ov) ov.remove();
+  }
+  function run() {
+    if (!document.body) return;
+    styleHost();
+    const player = findPlayer();
+    if (player) { clearNoVideo(); hideAround(player); }
+    else { showNoVideo(); }
+  }
+  run();
+  // w2g often (a) mounts the player AFTER the page loads, and (b) updates an
+  // already-existing iframe's src when the host changes the video — that's an
+  // ATTRIBUTE mutation, not a childList one — so the observer has to watch
+  // attribute changes for src too, not just node additions.
+  const obs = new MutationObserver(() => { try { run(); } catch (e) {} });
+  obs.observe(document.documentElement, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ['src', 'data-src'],
+  });
+})();
+`;
+function destroyW2gView() {
+  if (!w2gView) return;
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.contentView.removeChildView(w2gView); } catch {}
+  try { w2gView.webContents.destroy(); } catch {}
+  w2gView = null;
+}
+ipcMain.handle('w2g:open', (_e, url, mode) => {
+  if (!mainWindow || mainWindow.isDestroyed() || !isW2gHost(url)) return false;
+  if (!w2gView) {
+    w2gView = new WebContentsView({
+      webPreferences: { partition: 'persist:w2g', autoplayPolicy: 'no-user-gesture-required' },
+    });
+    mainWindow.contentView.addChildView(w2gView);
+    // Popups → real browser (sign-in flows, "open in new window" links).
+    w2gView.webContents.setWindowOpenHandler(({ url: u }) => {
+      if (typeof u === 'string' && /^https?:\/\//.test(u)) shell.openExternal(u);
+      return { action: 'deny' };
+    });
+    // Top-level navigation away from w2g.tv → real browser, keeping this
+    // view scoped (not a general embedded site).
+    w2gView.webContents.on('will-navigate', (ev, u) => {
+      if (!isW2gHost(u)) { ev.preventDefault(); if (/^https?:\/\//.test(u)) shell.openExternal(u); }
+    });
+    // Inject the just-video chrome-stripper on every load — but only in
+    // 'just-video' mode. In 'full' (Show chat) mode we render w2g's page
+    // as-is so the user sees chat + member list + playlist.
+    w2gView.webContents.on('did-finish-load', () => {
+      if (w2gView && w2gView.__mode !== 'full') {
+        w2gView.webContents.executeJavaScript(W2G_JUST_VIDEO_JS).catch(() => {});
+      }
+    });
+    w2gView.webContents.on('did-frame-finish-load', (_e, isMain) => {
+      if (isMain && w2gView && w2gView.__mode !== 'full') {
+        w2gView.webContents.executeJavaScript(W2G_JUST_VIDEO_JS).catch(() => {});
+      }
+    });
+  }
+  w2gView.__mode = (mode === 'full') ? 'full' : 'just-video';
+  w2gView.webContents.loadURL(url);
+  return true;
+});
+ipcMain.handle('w2g:bounds', (_e, b) => {
+  if (w2gView && b) {
+    w2gView.setBounds({
+      x: Math.round(b.x || 0), y: Math.round(b.y || 0),
+      width: Math.max(0, Math.round(b.width || 0)), height: Math.max(0, Math.round(b.height || 0)),
+    });
+  }
+});
+ipcMain.handle('w2g:setVisible', (_e, vis) => { if (w2gView) w2gView.setVisible(!!vis); });
+ipcMain.handle('w2g:close', () => destroyW2gView());
 
 ipcMain.handle('window:set-opacity', (_e, value) => {
   if (typeof value !== 'number' || !isFinite(value)) return;

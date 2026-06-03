@@ -114,6 +114,17 @@ contextBridge.exposeInMainWorld('app', {
   clearAuthSync:    () => clearFileSync(authFile),
   saveStateSync:    (json) => writeJsonSync(stateFile, json),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  // Watch2Gether embed: a native WebContentsView managed by main, kept aligned
+  // to a placeholder element in the renderer (see app.js renderW2G). The guest
+  // is auto-stripped to just the video on each load (main.js W2G_JUST_VIDEO_JS).
+  w2g: {
+    // mode: 'just-video' (default, strips w2g's chrome down to the player)
+    //   or 'full' (renders w2g's page as-is — chat, member list, playlist).
+    open:       (url, mode) => ipcRenderer.invoke('w2g:open', url, mode),
+    setBounds:  (b)         => ipcRenderer.invoke('w2g:bounds', b),
+    setVisible: (v)         => ipcRenderer.invoke('w2g:setVisible', v),
+    close:      ()          => ipcRenderer.invoke('w2g:close'),
+  },
   setWindowOpacity: (v) => ipcRenderer.invoke('window:set-opacity', v),
   setWindowMaterial: (m) => ipcRenderer.invoke('window:set-material', m),
   // Whether the window was CREATED transparent this launch — true for BOTH

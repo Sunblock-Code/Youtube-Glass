@@ -653,6 +653,9 @@ async function go(route, ...args) {
     destroy(v);
   }
   currentVideoId = null;
+  // Tear down the native Watch2Gether overlay if it's up, so it never lingers
+  // over a different route.
+  try { closeW2GView(); } catch {}
 
   view.scrollTop = 0;
   view.innerHTML = `<div class="loader">Loading</div>`;
@@ -1995,6 +1998,38 @@ function w2gUrlFromAny(q) {
   } catch {}
   return null;
 }
+// Saved w2g room list — surfaced in the Watch-together modal's w2g tab so
+// recently-opened rooms are one click away.
+const W2G_SAVED_KEY = 'w2g-saved-rooms';
+const W2G_SAVED_MAX = 12;
+function w2gSavedRooms() {
+  try { const r = JSON.parse(localStorage.getItem(W2G_SAVED_KEY) || '[]'); return Array.isArray(r) ? r : []; }
+  catch { return []; }
+}
+function w2gRoomLabel(url) {
+  try {
+    const u = new URL(url);
+    const rid = u.searchParams.get('room_id') || u.searchParams.get('access_key') || '';
+    // room_id is usually "human-name-randomhash" — drop the trailing hash
+    // (10+ chars of alphanumerics with no further dash) to recover a readable
+    // label like "Saturday Night With He Boys".
+    const m = rid.match(/^(.+?)-([a-z0-9]{10,})$/i);
+    const slug = (m ? m[1] : rid) || '';
+    if (slug) return slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return 'Watch2Gether room';
+  } catch { return 'Watch2Gether room'; }
+}
+function w2gSaveRoom(url) {
+  if (!w2gUrlFromAny(url)) return;
+  const list = w2gSavedRooms().filter(r => r && r.url !== url);
+  list.unshift({ url, name: w2gRoomLabel(url), savedAt: Date.now() });
+  while (list.length > W2G_SAVED_MAX) list.pop();
+  try { localStorage.setItem(W2G_SAVED_KEY, JSON.stringify(list)); } catch {}
+}
+function w2gRemoveSavedRoom(url) {
+  const list = w2gSavedRooms().filter(r => r && r.url !== url);
+  try { localStorage.setItem(W2G_SAVED_KEY, JSON.stringify(list)); } catch {}
+}
 
 // Which loader the URL needs: HLS (hls.js / native), DASH (dash.js), or a
 // plain progressive file the <video> element can take via its src directly.
@@ -2081,46 +2116,80 @@ async function renderDirectUrl(url) {
     window.app?.openExternal?.(url) || window.open(url, '_blank');
 }
 
-// Embedded Watch2Gether room. A docked <webview> loads the real w2g page, so
-// the room's sync, playlist, chat and video playback all work for free (it's
-// the actual w2g app, just inside a Glass panel). The <webview> tag is enabled
-// in main.js (webviewTag) and the guest runs sandboxed with no Node access.
+// Embedded Watch2Gether room. The <webview> tag loaded the page but wouldn't
+// PLAY video; a real WebContentsView (managed by main.js) does, and a script
+// injected into the guest strips w2g's chrome so the user sees just the video.
+// We dock the native view over the placeholder below and keep it aligned to
+// that element via w2g:bounds.
+let _w2gResizeObserver = null;
+let _w2gSyncBounds = null;
+// Tear down the native w2g view + its bounds listeners. Called from go()
+// whenever we navigate away, so the overlay never lingers over another page.
+function closeW2GView() {
+  if (_w2gResizeObserver) { try { _w2gResizeObserver.disconnect(); } catch {} _w2gResizeObserver = null; }
+  if (_w2gSyncBounds) { window.removeEventListener('resize', _w2gSyncBounds); _w2gSyncBounds = null; }
+  try { window.app?.w2g?.close(); } catch {}
+}
+// View mode for the w2g panel. Persisted across sessions so users don't have
+// to reset their preference each time.
+const W2G_MODE_KEY = 'w2g-view-mode';
+function w2gViewMode() {
+  return localStorage.getItem(W2G_MODE_KEY) === 'full' ? 'full' : 'just-video';
+}
+function w2gSetViewMode(m) {
+  localStorage.setItem(W2G_MODE_KEY, m === 'full' ? 'full' : 'just-video');
+}
 async function renderW2G(url) {
+  const mode = w2gViewMode();
+  const toggleLabel = (m) => m === 'full' ? 'Just video' : 'Show chat';
+  const subText = (m) => m === 'full'
+    ? 'Full w2g view · chat &amp; member list visible'
+    : 'Just-the-video view · sync handled by w2g.tv in the background';
   view.innerHTML = `
     <div class="w2g-page">
       <div class="w2g-head">
         <div class="w2g-headtext">
           <h1 class="w2g-title">Watch2Gether</h1>
-          <div class="w2g-sub">Embedded room · sync &amp; chat handled by w2g.tv</div>
+          <div class="w2g-sub" id="w2g-sub">${subText(mode)}</div>
         </div>
+        <button class="direct-act" id="w2g-mode" type="button" title="Toggle just-video / full-page view">${toggleLabel(mode)}</button>
         <button class="direct-act" id="w2g-reload" type="button">Reload</button>
         <button class="direct-act" id="w2g-open" type="button">Open in browser</button>
       </div>
-      <div class="w2g-frame">
-        <webview id="w2g-webview" src="${escapeAttr(url)}" partition="persist:w2g"></webview>
+      <div class="w2g-frame" id="w2g-frame">
+        <div class="w2g-placeholder">Loading room…</div>
       </div>
-      <div class="direct-error" id="w2g-error" hidden></div>
     </div>
   `;
-  const wv = view.querySelector('#w2g-webview');
-  const errEl = view.querySelector('#w2g-error');
+  const frame = view.querySelector('#w2g-frame');
+  const subEl = view.querySelector('#w2g-sub');
+  const modeBtn = view.querySelector('#w2g-mode');
   const openExt = () => { if (window.app?.openExternal) window.app.openExternal(url); else window.open(url, '_blank'); };
   view.querySelector('#w2g-open')?.addEventListener('click', openExt);
-  view.querySelector('#w2g-reload')?.addEventListener('click', () => { try { wv?.reload(); } catch {} });
-  if (wv) {
-    wv.addEventListener('did-finish-load', () => { if (errEl) errEl.hidden = true; });
-    wv.addEventListener('did-fail-load', (e) => {
-      // -3 = ERR_ABORTED, fired for sub-resource/redirect hops; only surface
-      // a real top-level failure.
-      if (e && e.isMainFrame !== false && e.errorCode && e.errorCode !== -3 && errEl) {
-        errEl.hidden = false;
-        errEl.innerHTML =
-          `<strong>Couldn't load the Watch2Gether room.</strong> ` +
-          `(${escape(String(e.errorCode))} ${escape(e.errorDescription || '')}) — ` +
-          `try Reload, or open it in your browser.`;
-      }
-    });
-  }
+  view.querySelector('#w2g-reload')?.addEventListener('click', () => { try { window.app?.w2g?.open(url, w2gViewMode()); } catch {} });
+  // Mode toggle — switches the view between just-video (chrome stripped) and
+  // full w2g page (chat + members visible). Persists the choice and reloads
+  // the embed so the new mode takes effect cleanly.
+  modeBtn?.addEventListener('click', () => {
+    const newMode = w2gViewMode() === 'full' ? 'just-video' : 'full';
+    w2gSetViewMode(newMode);
+    if (modeBtn) modeBtn.textContent = toggleLabel(newMode);
+    if (subEl) subEl.innerHTML = subText(newMode);
+    try { window.app?.w2g?.open(url, newMode); } catch {}
+  });
+
+  if (!window.app?.w2g || !frame) return;
+  const sync = () => {
+    if (!frame.isConnected) return;
+    const b = frame.getBoundingClientRect();
+    window.app.w2g.setBounds({ x: b.left, y: b.top, width: b.width, height: b.height });
+  };
+  await window.app.w2g.open(url, mode);
+  sync();
+  _w2gSyncBounds = sync;
+  _w2gResizeObserver = new ResizeObserver(sync);
+  _w2gResizeObserver.observe(frame);
+  window.addEventListener('resize', sync);
 }
 
 async function renderVideo(id) {
@@ -4315,6 +4384,11 @@ function escapeAttr(s = '') { return escape(s); }
 // Account modal
 // ============================================================
 function openModal(html, opts = {}) {
+  // The w2g WebContentsView is a NATIVE overlay sitting above the DOM, so any
+  // modal opened by the renderer would render behind it. Hide the view while a
+  // modal is up so Donate / Account / Settings / etc. menus are actually
+  // visible; the closeModal handler shows it again. No-op if no view is up.
+  try { window.app?.w2g?.setVisible(false); } catch {}
   modalBody.innerHTML = html;
   const card = modal.querySelector('.modal-card');
   card.classList.toggle('wide', !!opts.wide);
@@ -4342,6 +4416,8 @@ function closeModal() {
   card.classList.remove('settings');
   modal.classList.remove('settings-open');
   modalBody.innerHTML = '';
+  // Restore the native w2g view that openModal hid (no-op if no view).
+  try { window.app?.w2g?.setVisible(true); } catch {}
 }
 modal.querySelector('.modal-bg').onclick = closeModal;
 // Belt-and-braces: any click on the modal wrapper that wasn't on the card
@@ -6050,40 +6126,58 @@ function showWatchPartyStart() {
   const savedName = localStorage.getItem('wp-name') || '';
   openModal(`
     <h2 data-wp-modal>Watch together</h2>
-    <div class="modal-sub">Sync video playback with friends — share a code or join one.</div>
+    <div class="modal-sub">Sync with friends in Glass, or open a Watch2Gether room docked in the UI.</div>
 
-    <div class="wp-name-row">
-      <label class="wp-field-label" for="wp-name">Your name</label>
-      <input type="text" id="wp-name" class="wp-name-input" maxlength="24" placeholder="What should others see?" autocomplete="off" spellcheck="false" value="${escapeAttr(savedName)}" />
+    <div class="wp-tabs" role="tablist" aria-label="Watch together mode">
+      <button class="wp-tab active" data-wp-tab="sync" role="tab" aria-selected="true">Glass Sync</button>
+      <button class="wp-tab" data-wp-tab="w2g" role="tab" aria-selected="false">Watch2Gether</button>
     </div>
 
-    <div class="auth-options">
-      <button class="auth-card" id="wp-start" type="button">
-        <span class="auth-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
-          </svg>
-        </span>
-        <div class="auth-text"><strong>Start a room</strong><span>Get a 6-character code to share.</span></div>
-      </button>
+    <div class="wp-tab-pane active" data-wp-pane="sync" role="tabpanel">
+      <div class="wp-name-row">
+        <label class="wp-field-label" for="wp-name">Your name</label>
+        <input type="text" id="wp-name" class="wp-name-input" maxlength="24" placeholder="What should others see?" autocomplete="off" spellcheck="false" value="${escapeAttr(savedName)}" />
+      </div>
 
-      <div class="auth-card auth-card-static wp-join-card">
-        <div class="auth-card-head">
+      <div class="auth-options">
+        <button class="auth-card" id="wp-start" type="button">
           <span class="auth-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+              <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
             </svg>
           </span>
-          <div class="auth-text"><strong>Join a room</strong><span>Enter a code someone sent you.</span></div>
-        </div>
-        <div class="wp-join-form">
-          <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
-          <button id="wp-join-go" class="modal-btn primary">Join</button>
+          <div class="auth-text"><strong>Start a room</strong><span>Get a 6-character code to share.</span></div>
+        </button>
+
+        <div class="auth-card auth-card-static wp-join-card">
+          <div class="auth-card-head">
+            <span class="auth-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+            </span>
+            <div class="auth-text"><strong>Join a room</strong><span>Enter a code someone sent you.</span></div>
+          </div>
+          <div class="wp-join-form">
+            <input type="text" id="wp-code-input" maxlength="${ROOM_CODE_LENGTH}" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
+            <button id="wp-join-go" class="modal-btn primary">Join</button>
+          </div>
         </div>
       </div>
+
+      <div id="wp-msg" class="hint wp-msg"></div>
     </div>
 
-    <div id="wp-msg" class="hint wp-msg"></div>
+    <div class="wp-tab-pane" data-wp-pane="w2g" role="tabpanel" hidden>
+      <div class="wp-w2g-input-row">
+        <input type="text" id="wp-w2g-url" placeholder="https://w2g.tv/en/room/?room_id=…" autocomplete="off" spellcheck="false" />
+        <button id="wp-w2g-open" class="modal-btn primary" type="button">Open</button>
+      </div>
+      <div class="wp-w2g-hint">Paste a Watch2Gether room link — it opens docked in the panel, stripped to just the video.</div>
+      <div class="wp-w2g-saved-title">Saved rooms</div>
+      <div class="wp-w2g-saved" id="wp-w2g-saved"></div>
+      <div id="wp-w2g-msg" class="hint wp-msg"></div>
+    </div>
   `);
 
   const msgEl = modalBody.querySelector('#wp-msg');
@@ -6170,6 +6264,86 @@ function showWatchPartyStart() {
   setTimeout(() => {
     (savedName ? codeInput : nameInput).focus();
   }, 0);
+
+  // --- Tabs (Glass Sync | Watch2Gether) ---
+  const tabs = modalBody.querySelectorAll('.wp-tab');
+  const panes = modalBody.querySelectorAll('.wp-tab-pane');
+  tabs.forEach(t => {
+    t.onclick = () => {
+      const target = t.dataset.wpTab;
+      tabs.forEach(b => {
+        const on = b === t;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panes.forEach(p => {
+        const on = p.dataset.wpPane === target;
+        p.classList.toggle('active', on);
+        p.hidden = !on;
+      });
+      // Move focus to the most useful field of the newly-active tab.
+      if (target === 'w2g') modalBody.querySelector('#wp-w2g-url')?.focus();
+      else (cleanName() ? codeInput : nameInput).focus();
+    };
+  });
+
+  // --- Watch2Gether tab: paste link + saved rooms ---
+  const w2gMsgEl = modalBody.querySelector('#wp-w2g-msg');
+  const setW2gMsg = (text, kind = '') => {
+    if (!w2gMsgEl) return;
+    w2gMsgEl.textContent = text || '';
+    w2gMsgEl.dataset.kind = kind;
+  };
+  const renderW2GSaved = () => {
+    const list = w2gSavedRooms();
+    const el = modalBody.querySelector('#wp-w2g-saved');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = `<div class="wp-w2g-empty">No saved rooms yet. Paste a w2g.tv link above to add one.</div>`;
+      return;
+    }
+    el.innerHTML = list.map(r => `
+      <div class="wp-w2g-row" data-url="${escapeAttr(r.url)}">
+        <button class="wp-w2g-row-go" type="button" title="Open in Glass">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16" fill="currentColor" stroke="none"/></svg>
+          <span class="wp-w2g-row-name">${escape(r.name || 'Watch2Gether room')}</span>
+        </button>
+        <button class="wp-w2g-row-ext" type="button" data-ext="${escapeAttr(r.url)}" aria-label="Open in real browser" title="Open in your default browser (where w2g's extension can run)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+        <button class="wp-w2g-row-del" type="button" data-del="${escapeAttr(r.url)}" aria-label="Remove from saved" title="Remove">×</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('.wp-w2g-row-go').forEach(b => {
+      b.onclick = () => { const url = b.closest('.wp-w2g-row').dataset.url; closeModal(); go('w2g', url); };
+    });
+    el.querySelectorAll('.wp-w2g-row-ext').forEach(b => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        const url = b.dataset.ext;
+        if (url) { try { window.app?.openExternal?.(url) || window.open(url, '_blank'); } catch {} }
+      };
+    });
+    el.querySelectorAll('.wp-w2g-row-del').forEach(b => {
+      b.onclick = (e) => { e.stopPropagation(); w2gRemoveSavedRoom(b.dataset.del); renderW2GSaved(); };
+    });
+  };
+  renderW2GSaved();
+
+  const w2gInput = modalBody.querySelector('#wp-w2g-url');
+  const w2gOpen = () => {
+    const raw = (w2gInput?.value || '').trim();
+    if (!raw) { setW2gMsg('Paste a w2g.tv room URL.', 'error'); w2gInput?.focus(); return; }
+    const valid = w2gUrlFromAny(raw);
+    if (!valid) { setW2gMsg("That doesn't look like a w2g.tv link.", 'error'); w2gInput?.focus(); return; }
+    w2gSaveRoom(valid);
+    closeModal();
+    go('w2g', valid);
+  };
+  modalBody.querySelector('#wp-w2g-open')?.addEventListener('click', w2gOpen);
+  w2gInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); w2gOpen(); }
+  });
 }
 
 function showWatchPartyRoom() {

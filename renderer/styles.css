@@ -2423,12 +2423,19 @@ input[type="checkbox"].glass-check:checked::after {
   flex-direction: column;
   margin: auto;     /* belt-and-braces vertical centring inside the flex parent */
 }
-/* The scrolling area is the ONLY flexible part; the footer is a reserved
-   row that never shrinks or gets pushed out of the card. */
-.modal-card.settings .settings-body { flex: 1 1 0; min-height: 0; }
+/* The scrolling area is the ONLY flexible part. The Reset / Done footer is
+   absolutely positioned to the card's bottom so it stays put regardless of
+   what the flex algorithm does with the body (Chromium occasionally treats a
+   min()-based height as indefinite and the body stops filling, which let the
+   footer drift up under the previous flex-only layout). The body reserves
+   bottom space so scrolling content never goes behind the pinned footer. */
+.modal-card.settings .settings-body { flex: 1 1 0; min-height: 0; padding-bottom: 64px; }
 .modal-card.settings .modal-actions {
-  flex: 0 0 auto;
-  margin-top: 16px;
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  margin-top: 0;
 }
 /* No darkening / blur backdrop when the settings modal is open — the user
    should see the app behind it cleanly. */
@@ -5524,6 +5531,126 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .wp-join-form .modal-btn:active:not(:disabled) { transform: scale(0.97); }
 .wp-join-form .modal-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Watch-together modal tabs (Glass Sync | Watch2Gether). Same idiom as the
+   settings tabs — pill-style row at the top, only one pane visible at once. */
+.wp-tabs { display: flex; gap: 6px; margin: 14px 0 16px; }
+.wp-tab {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wp-tab:hover { color: var(--text); background: var(--glass); }
+.wp-tab.active {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: rgba(192, 132, 252, 0.40);
+}
+.wp-tab-pane { display: none; }
+.wp-tab-pane.active { display: block; }
+
+/* Watch2Gether tab: paste-link row + saved-rooms list. */
+.wp-w2g-input-row { display: flex; gap: 8px; margin-top: 4px; }
+.wp-w2g-input-row input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.wp-w2g-input-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--glass-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.wp-w2g-input-row .modal-btn { flex-shrink: 0; height: 38px; padding: 0 18px; }
+.wp-w2g-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.wp-w2g-saved-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #e9e4ff;
+  margin: 18px 0 8px;
+  font-weight: 700;
+}
+.wp-w2g-saved {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.wp-w2g-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 4px;
+}
+.wp-w2g-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass);
+  transition: background 0.15s, border-color 0.15s;
+}
+.wp-w2g-row:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
+.wp-w2g-row-go {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.wp-w2g-row-go svg { color: var(--accent); flex-shrink: 0; }
+.wp-w2g-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-w2g-row-ext,
+.wp-w2g-row-del {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.wp-w2g-row-del { font-size: 18px; line-height: 1; margin-right: 5px; }
+.wp-w2g-row-ext:hover { color: var(--accent); background: var(--accent-soft); }
+.wp-w2g-row-del:hover { color: #f87171; background: rgba(248, 113, 113, 0.10); }
 /* Default state: a quiet single-line strip below the join card. Once a
    real message lands (loading / error), the strip lifts into a proper
    pill so the user can actually tell something is happening. */
@@ -6337,10 +6464,15 @@ body.dragging-panel * { cursor: grabbing !important; }
   overflow: hidden;
   background: #000;
   box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.55);
+  position: relative;
 }
-.w2g-frame webview {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  border: 0;
+/* Placeholder under the native WebContentsView — shown briefly before the
+   native overlay paints, and again as a quiet backdrop if it's torn down. */
+.w2g-placeholder {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+  font: 13px inherit;
+  letter-spacing: 0.4px;
+  pointer-events: none;
 }
