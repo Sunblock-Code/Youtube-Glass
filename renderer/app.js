@@ -2847,10 +2847,17 @@ async function renderVideo(id) {
   };
 
   // Buffering visual: dim scrim + spinner + "Buffering…" so the wait is
-  // unmistakable (it reads as paused-loading, not a frozen frame). waiting/
-  // stalled add the class + feed the stall counter; playing/canplay/seeked
-  // clear it.
+  // unmistakable (it reads as paused-loading, not a frozen frame).
+  //   - Only show while the video is actually TRYING to play but lacks data —
+  //     never when it's paused/ended (incl. autoplay-blocked at start), or the
+  //     spinner would stick on a still frame ("spins even when not buffering").
+  //   - Clear it on any sign of life: playing, can-play, seek done, pause,
+  //     ended, suspend (fetch stopped because the buffer is full), and on
+  //     timeupdate (currentTime advanced ⇒ definitely not buffering).
+  let _lastBufTime = -1;
   const onWaiting = () => {
+    if (v.paused || v.ended || v.seeking) return;        // not a playback stall
+    if (v.readyState >= 3) return;                        // has enough data
     playerWrapEl?.classList.add('buffering');
     const now = Date.now();
     _stallTimes.push(now);
@@ -2858,11 +2865,20 @@ async function renderVideo(id) {
     if (_stallTimes.length >= STALL_TRIGGER) autoDowngrade();
   };
   const onResumed = () => playerWrapEl?.classList.remove('buffering');
+  const onTimeAdvance = () => {
+    // If the playhead moved, playback is live → kill any lingering spinner.
+    if (v.currentTime !== _lastBufTime) { _lastBufTime = v.currentTime; onResumed(); }
+  };
   v.addEventListener('waiting', onWaiting);
   v.addEventListener('stalled', onWaiting);
   v.addEventListener('playing', onResumed);
   v.addEventListener('canplay', onResumed);
+  v.addEventListener('canplaythrough', onResumed);
   v.addEventListener('seeked',  onResumed);
+  v.addEventListener('pause',   onResumed);
+  v.addEventListener('ended',   onResumed);
+  v.addEventListener('suspend', onResumed);
+  v.addEventListener('timeupdate', onTimeAdvance);
 
   v.addEventListener('emptied', () => {
     pbAlive = false;
@@ -2871,7 +2887,12 @@ async function renderVideo(id) {
     v.removeEventListener('stalled', onWaiting);
     v.removeEventListener('playing', onResumed);
     v.removeEventListener('canplay', onResumed);
+    v.removeEventListener('canplaythrough', onResumed);
     v.removeEventListener('seeked',  onResumed);
+    v.removeEventListener('pause',   onResumed);
+    v.removeEventListener('ended',   onResumed);
+    v.removeEventListener('suspend', onResumed);
+    v.removeEventListener('timeupdate', onTimeAdvance);
   }, { once: true });
 
   // Resume save still rides on `timeupdate` — it's throttled to 5s anyway so
