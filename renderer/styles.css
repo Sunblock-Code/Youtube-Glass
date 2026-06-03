@@ -1392,23 +1392,23 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .dash-page-header .section-title {
   margin: 0;
   flex: 1;
-  /* Glass wordmark styling — same lavender-glow treatment as the GLASS
-     titlebar text, just smaller. Static layered glow + a subtle filter
-     animation for a soft pulse. */
+  /* Glass wordmark styling — same WHITE-glow treatment as the GLASS titlebar
+     text, just smaller. (Was lavender; switched to white to match the
+     wordmark so all the glowing headings read as one consistent style.) */
   font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   font-size: 15px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 4px;
   line-height: 1;
-  color: #e9d5ff;
+  color: #ffffff;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
   text-shadow:
-    0 0 8px  rgba(216, 180, 254, 0.45),
-    0 0 20px rgba(168,  85, 247, 0.22);
+    0 0 8px  rgba(255, 255, 255, 0.45),
+    0 0 20px rgba(255, 255, 255, 0.22);
   will-change: filter;
-  animation: brandGlow 5s ease-in-out infinite;
+  animation: brandGlowWhite 5s ease-in-out infinite;
 }
 
 /* Comment composer — Piped is read-only so this drafts text in-app, copies
