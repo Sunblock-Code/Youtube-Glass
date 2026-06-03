@@ -760,7 +760,14 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 
 .section-title {
   font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
-  color: var(--muted); margin: 0 0 16px;
+  /* Page headings (FOR YOU, TRENDING, YOUR MIX, RESULTS …) used var(--muted),
+     a fixed purple-grey that read as "purple" in every theme. Tint them to the
+     active accent (a light mix so they stay legible) with a faint matching
+     glow, so they follow the theme like the COMMENTS / UP NEXT headings.
+     The wrapped headings keep their own fuller rule (higher specificity). */
+  color: color-mix(in srgb, var(--accent) 62%, #e8e3f5);
+  margin: 0 0 16px;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* --- Video grid --- */
