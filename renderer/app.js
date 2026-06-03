@@ -2846,53 +2846,51 @@ async function renderVideo(id) {
     setTimeout(clearBanner, 7000);
   };
 
-  // Buffering visual: dim scrim + spinner + "Buffering…" so the wait is
-  // unmistakable (it reads as paused-loading, not a frozen frame).
-  //   - Only show while the video is actually TRYING to play but lacks data —
-  //     never when it's paused/ended (incl. autoplay-blocked at start), or the
-  //     spinner would stick on a still frame ("spins even when not buffering").
-  //   - Clear it on any sign of life: playing, can-play, seek done, pause,
-  //     ended, suspend (fetch stopped because the buffer is full), and on
-  //     timeupdate (currentTime advanced ⇒ definitely not buffering).
-  let _lastBufTime = -1;
-  const onWaiting = () => {
-    if (v.paused || v.ended || v.seeking) return;        // not a playback stall
-    if (v.readyState >= 3) return;                        // has enough data
-    playerWrapEl?.classList.add('buffering');
-    const now = Date.now();
-    _stallTimes.push(now);
-    _stallTimes = _stallTimes.filter(t => now - t < STALL_WINDOW);
-    if (_stallTimes.length >= STALL_TRIGGER) autoDowngrade();
+  // Buffering visual: dim scrim + spinner + "Buffering…".
+  //
+  // The HTML5 `waiting`/`stalled` events are unreliable on the video-only +
+  // sidecar-audio path — they fire spuriously during perfectly smooth playback
+  // (between media fragments), which made the spinner flash/stick "when not
+  // buffering". So we ignore those events and poll the GROUND TRUTH instead:
+  // is the playhead actually advancing? If currentTime stops moving while the
+  // video is meant to be playing (not paused / ended / seeking), it's really
+  // buffering — show the spinner. The moment it advances again (or the user
+  // pauses), hide it. A short freeze must persist past one poll + the CSS
+  // 350 ms fade-in (~750 ms total) before anything shows, so micro-hitches
+  // never flash the overlay.
+  let _bufLastT = v.currentTime || 0;
+  let _bufFrozen = false;   // are we currently in a detected freeze?
+  const setBuffering = (on) => {
+    if (on) playerWrapEl?.classList.add('buffering');
+    else playerWrapEl?.classList.remove('buffering');
   };
-  const onResumed = () => playerWrapEl?.classList.remove('buffering');
-  const onTimeAdvance = () => {
-    // If the playhead moved, playback is live → kill any lingering spinner.
-    if (v.currentTime !== _lastBufTime) { _lastBufTime = v.currentTime; onResumed(); }
+  const bufTick = () => {
+    if (!pbAlive) return;
+    if (v.paused || v.ended || v.seeking) { setBuffering(false); _bufFrozen = false; _bufLastT = v.currentTime; return; }
+    const advanced = Math.abs(v.currentTime - _bufLastT) > 0.01;
+    _bufLastT = v.currentTime;
+    if (advanced) {
+      setBuffering(false);
+      _bufFrozen = false;
+    } else {
+      setBuffering(true);
+      if (!_bufFrozen) {
+        // New freeze episode → count it toward the auto-downgrade trigger.
+        _bufFrozen = true;
+        const now = Date.now();
+        _stallTimes.push(now);
+        _stallTimes = _stallTimes.filter(t => now - t < STALL_WINDOW);
+        if (_stallTimes.length >= STALL_TRIGGER) autoDowngrade();
+      }
+    }
   };
-  v.addEventListener('waiting', onWaiting);
-  v.addEventListener('stalled', onWaiting);
-  v.addEventListener('playing', onResumed);
-  v.addEventListener('canplay', onResumed);
-  v.addEventListener('canplaythrough', onResumed);
-  v.addEventListener('seeked',  onResumed);
-  v.addEventListener('pause',   onResumed);
-  v.addEventListener('ended',   onResumed);
-  v.addEventListener('suspend', onResumed);
-  v.addEventListener('timeupdate', onTimeAdvance);
+  const bufInterval = setInterval(bufTick, 400);
 
   v.addEventListener('emptied', () => {
     pbAlive = false;
     if (pbRafId) cancelAnimationFrame(pbRafId);
-    v.removeEventListener('waiting', onWaiting);
-    v.removeEventListener('stalled', onWaiting);
-    v.removeEventListener('playing', onResumed);
-    v.removeEventListener('canplay', onResumed);
-    v.removeEventListener('canplaythrough', onResumed);
-    v.removeEventListener('seeked',  onResumed);
-    v.removeEventListener('pause',   onResumed);
-    v.removeEventListener('ended',   onResumed);
-    v.removeEventListener('suspend', onResumed);
-    v.removeEventListener('timeupdate', onTimeAdvance);
+    clearInterval(bufInterval);
+    setBuffering(false);
   }, { once: true });
 
   // Resume save still rides on `timeupdate` — it's throttled to 5s anyway so
