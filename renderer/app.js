@@ -261,6 +261,7 @@ const DEFAULT_SETTINGS = {
   showHeatmap: true,    // YouTube "Most Replayed" curve over the progress bar
   homeMode: 'mixed',    // Home feed: 'mixed' | 'trending' | 'foryou' | 'dashboard'
   subtitlePos: { x: 0.5, y: 0.88 }, // normalized center (fraction of player W/H) of the draggable caption box
+  subtitlesBelow: false, // when true, captions render in a box BELOW the video instead of overlaid on it
   pullout: {
     enabled: false,
     side: 'right',                           // 'left' | 'right'
@@ -388,6 +389,7 @@ function applySettings(s) {
   root.dataset.search = s.searchStyle === 'square' ? 'square' : 'pill';
   root.dataset.topnav = ['text', 'icon', 'both'].includes(s.topnavStyle) ? s.topnavStyle : 'text';
   root.dataset.heatmap = s.showHeatmap === false ? 'off' : 'on';
+  root.dataset.subsBelow = s.subtitlesBelow ? '1' : ''; // captions: box below video vs on-video overlay
   root.style.setProperty('--related-width', (s.relatedWidth || 380) + 'px');
   root.dataset.comments = s.commentsPlacement || 'auto';
   root.dataset.material = s.material || 'none';
@@ -2471,8 +2473,13 @@ async function renderVideo(id) {
 
             <div class="cc-opt-section-label" style="margin-top:14px">Caption placement</div>
             <div class="cc-opt-hint">Drag the caption text anywhere on the video to reposition it. The spot is remembered for every video.</div>
+            <label class="cc-opt-check" style="margin-top:12px">
+              <input type="checkbox" id="cc-subs-below-toggle" class="glass-check" ${currentSettings.subtitlesBelow ? 'checked' : ''} />
+              Show subtitles in a box below the video
+            </label>
           </div>
         </div>
+        <div class="cc-subs-below" id="cc-subs-below" aria-hidden="true"></div>
         <div class="video-meta">
           <div class="title-row">
             <h1>${escape(data.title || '')}</h1>
@@ -4107,6 +4114,17 @@ function attachCustomControls(v, root, data = {}) {
         saveSettings(currentSettings);
       };
     }
+    // Captions: on-video overlay vs a box below the video. Both are always
+    // painted (see paintCues); this just flips data-subs-below so CSS swaps
+    // which one shows — instant, no reload.
+    const subsBelowToggle = optPanel.querySelector('#cc-subs-below-toggle');
+    if (subsBelowToggle) {
+      subsBelowToggle.onchange = () => {
+        currentSettings.subtitlesBelow = subsBelowToggle.checked;
+        applySettings(currentSettings);
+        saveSettings(currentSettings);
+      };
+    }
 
     // ---------- Speed pills ----------
     const speedRow = optPanel.querySelector('#cc-opt-speed');
@@ -4308,6 +4326,7 @@ function attachCustomControls(v, root, data = {}) {
       // but the browser draws nothing) and paint the active cue text into
       // our own absolutely-positioned, draggable box instead.
       const subBox = wrap.querySelector('#cc-subs');
+      const belowBox = view.querySelector('#cc-subs-below'); // captions box under the video (gear toggle)
       const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
       // Place the box at the user's saved normalized centre (a fraction of
@@ -4340,11 +4359,13 @@ function attachCustomControls(v, root, data = {}) {
         return (tmp.textContent || '').trim();
       };
       const paintCues = (tt) => {
-        if (!subBox) return;
         const active = tt && tt.activeCues ? Array.from(tt.activeCues) : [];
         const txt = active.map(cueText).filter(Boolean).join('\n');
-        subBox.textContent = txt;
-        subBox.classList.toggle('has-text', !!txt);
+        // Paint BOTH the on-video overlay and the below-video box; CSS
+        // (data-subs-below) decides which is visible, so flipping the gear
+        // toggle swaps instantly without re-running any cue logic.
+        if (subBox)   { subBox.textContent = txt;   subBox.classList.toggle('has-text', !!txt); }
+        if (belowBox) { belowBox.textContent = txt; belowBox.classList.toggle('has-text', !!txt); }
       };
 
       let activeTrack = null;   // the <track> element
@@ -4354,7 +4375,8 @@ function attachCustomControls(v, root, data = {}) {
         if (activeTT && onCueChange) activeTT.removeEventListener('cuechange', onCueChange);
         onCueChange = null;
         activeTT = null;
-        if (subBox) { subBox.textContent = ''; subBox.classList.remove('has-text'); }
+        if (subBox)   { subBox.textContent = '';   subBox.classList.remove('has-text'); }
+        if (belowBox) { belowBox.textContent = ''; belowBox.classList.remove('has-text'); }
       };
 
       ccList.querySelectorAll('.cc-dropdown-item').forEach(it => {

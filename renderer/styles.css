@@ -3518,7 +3518,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   right: 12px;
   bottom: 56px;
   z-index: 6;
-  background: rgba(20, 12, 30, 0.92);
+  background: rgba(22, 24, 29, 0.96); /* grey + more opaque so text behind doesn't bleed (was purple rgba(20,12,30,.92)) */
   border: 1px solid var(--glass-border-strong);
   border-radius: 14px;
   padding: 14px;
@@ -3549,6 +3549,36 @@ body.dragging-panel * { cursor: grabbing !important; }
   transform: translateY(0) scale(1);
   pointer-events: auto;
 }
+/* Re-enable the blur in see-through modes — the blanket acrylic/clear kill rule
+   turns ALL backdrop-filters off, but this is a small static popover, so the
+   one frosted layer is fine and the blur is what keeps the text behind from
+   bleeding through (the whole point of the gear menu being readable). */
+:root[data-bgmode="acrylic"] .cc-options-panel,
+:root[data-bgmode="clear"] .cc-options-panel {
+  backdrop-filter: blur(28px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(140%) !important;
+}
+
+/* Subtitles in a box BELOW the video (gear → "Show subtitles in a box below the
+   video"). Painted in parallel with the on-video overlay (#cc-subs);
+   data-subs-below picks which one is visible. Sits in normal flow between the
+   player and the title. */
+.cc-subs-below {
+  display: none;
+  margin: 10px 0 2px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+:root[data-subs-below="1"] .cc-subs-below.has-text { display: block; }
+:root[data-subs-below="1"] #cc-subs { display: none !important; } /* hide the on-video overlay in box mode */
 .cc-opt-section-label {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 1.2px;
