@@ -1436,7 +1436,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      element it ghosts as content scrolls behind. In acrylic the ~10% that
      still shows through is the OS-frosted desktop, so it reads as frosted
      glass without any of that smear. */
-  background: rgba(11, 7, 17, 0.9);
+  background: rgba(18, 20, 24, 0.9); /* neutral grey (was purple rgba(11,7,17)) */
   border-bottom: 1px solid var(--glass-border);
   /* Align the panel to the comment rows below it (the list's 4px row inset)
      instead of the old wider overhang, so the "box that says COMMENTS"
@@ -6261,7 +6261,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   position: sticky;
   top: 0;
   z-index: 8;
-  background: rgba(11, 7, 17, 0.9);
+  background: rgba(18, 20, 24, 0.9); /* neutral grey bar (was purple rgba(11,7,17)) */
   padding: 0 0 8px;
   /* Match the .comments-stickyhead panel below it (now at the comment-row
      edges, margin: 0 4px) so the tab row and the panel share the same width. */
@@ -6274,7 +6274,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   min-width: 0;
   height: 32px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -6302,8 +6302,8 @@ body.dragging-panel * { cursor: grabbing !important; }
 .comments-tab:hover { color: var(--text); background: var(--glass); }
 .comments-tab.active {
   color: var(--text);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 42%, transparent); /* theme accent (was hardcoded purple) */
+  background: var(--glass-strong);            /* neutral grey box (was the accent/"purple" fill) */
+  border-color: var(--glass-border-strong);
 }
 .chat-tab-dot {
   display: inline-block;
