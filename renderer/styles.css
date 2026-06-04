@@ -1303,16 +1303,30 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
     row-gap: 16px;
   }
   .player-page > .player-col { grid-row: 1; grid-column: 1; }
-  :root[data-comments="auto"] .player-page > .related-col,
   :root[data-comments="side"] .player-page > .related-col {
     grid-row: 2;
     grid-column: 1;
   }
-  :root[data-comments="auto"] .player-page > .comments-col,
   :root[data-comments="side"] .player-page > .comments-col {
     grid-row: 3;
     grid-column: 1;
   }
+  /* AUTO mode must NOT drop into the single-column stack that puts the related
+     sidebar UNDER the video — the user wants Up next/Subs/History/Queue ALWAYS
+     on the right, with only comments under the video. So hold the ≤1700 shape
+     (related spanning the right column, comments below the player) all the way
+     down to the 900px minimum window instead of collapsing to one column. */
+  :root[data-comments="auto"] .player-page {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: min-content min-content;
+    row-gap: 0;
+  }
+  :root[data-comments="auto"] .player-page.related-collapsed {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+  :root[data-comments="auto"] .player-page > .player-col   { grid-row: 1; grid-column: 1; }
+  :root[data-comments="auto"] .player-page > .comments-col { grid-row: 2; grid-column: 1; }
+  :root[data-comments="auto"] .player-page > .related-col  { grid-row: 1 / span 2; grid-column: 2; }
   /* No sticky headers in the single-column stack — pinning makes the related
      tab row and the comments header overlap the video/description stacked
      above them. Let them scroll with their own section instead. */
