@@ -127,6 +127,15 @@ contextBridge.exposeInMainWorld('app', {
   },
   setWindowOpacity: (v) => ipcRenderer.invoke('window:set-opacity', v),
   setWindowMaterial: (m) => ipcRenderer.invoke('window:set-material', m),
+  // Rounded corners are done natively (DWM) on Win11 so they work even with the
+  // acrylic material on. setRounded toggles it live; onNativeRounding tells the
+  // renderer when the OS is handling the corners so it can drop the CSS fallback.
+  setRounded: (b) => ipcRenderer.invoke('window:set-rounded', b),
+  onNativeRounding: (cb) => {
+    const handler = (_e, active) => cb(!!active);
+    ipcRenderer.on('window:native-rounding', handler);
+    return () => ipcRenderer.removeListener('window:native-rounding', handler);
+  },
   // Whether the window was CREATED transparent this launch — true for BOTH
   // Clear and Acrylic (both need the transparent window; acrylic's OS
   // material only renders on it). main.js reads the same settings file at

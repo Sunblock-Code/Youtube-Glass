@@ -67,26 +67,26 @@ body {
 :root[data-donate="hidden"] #donate-btn { display: none !important; }
 
 /* --- Rounded window corners (Settings → Theme → Appearance) ---
-   Rounds the WHOLE app window. Two layers paint window-edge pixels, so both
-   need the radius:
-   • body — its content rows (titlebar / banner / main) are position:relative
-     in-flow grid items, and body already has overflow:hidden + height:100%, so
-     a radius on body CLIPS all of them. That's what rounds all four corners,
-     including the bottom ones painted by `main` (those stayed square before —
-     the old rule only rounded .bg + the titlebar's top edge).
-   • .bg — position:fixed, so it escapes body's overflow clip and needs its own
-     matching radius.
-   The window is created transparent whenever this is on (see
-   launchedTransparent), so the rounded-off corner notches reveal the desktop
-   instead of a square fringe. Squared off while maximized (matches Windows and
-   avoids desktop notches at the screen corners). 14px matches the
-   card/channel-row radius. */
-:root[data-corners="rounded"] body,
-:root[data-corners="rounded"] .bg {
+   PRIMARY path is native: on Windows 11 main.js rounds the actual OS window via
+   DwmSetWindowAttribute, which is the ONLY thing that can round an acrylic/mica
+   window (its frosted OS material fills the square window rect, behind the page,
+   where CSS can't reach). When that's active the renderer sets data-native-round
+   on <html> and the rules below switch off — otherwise the 14px CSS clip would
+   double-round against the OS corner and leave a sliver in each one.
+
+   FALLBACK below (only when :not([data-native-round="1"]) — i.e. Windows 10 /
+   older, or koffi unavailable): clip the content ourselves. body's rows
+   (titlebar / banner / main) are position:relative in-flow grid items and body
+   has overflow:hidden + height:100%, so a radius on body rounds all four
+   corners; .bg is position:fixed so it escapes that clip and needs its own.
+   Works in transparent modes (corner notches reveal the desktop); squared off
+   while maximized. 14px matches the card/channel-row radius. */
+:root[data-corners="rounded"]:not([data-native-round="1"]) body,
+:root[data-corners="rounded"]:not([data-native-round="1"]) .bg {
   border-radius: 14px;
 }
-:root[data-corners="rounded"] body.win-maximized,
-:root[data-corners="rounded"] body.win-maximized .bg {
+:root[data-corners="rounded"]:not([data-native-round="1"]) body.win-maximized,
+:root[data-corners="rounded"]:not([data-native-round="1"]) body.win-maximized .bg {
   border-radius: 0;
 }
 

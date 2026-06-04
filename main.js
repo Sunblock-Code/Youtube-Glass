@@ -41,6 +41,72 @@ const launchedTransparent = (() => {
   return !!(s && (SEE_THROUGH_MODES.includes(s.bgMode) || s.roundedCorners));
 })();
 
+// --- Native window corner rounding (Windows) ------------------------------
+// CSS border-radius can't round the window when the acrylic/mica MATERIAL is
+// active: Windows paints that frosted material across the full SQUARE window
+// rect, behind the web content, where CSS can't reach. DWM's corner rounding
+// (DWMWA_WINDOW_CORNER_PREFERENCE) is ALSO out — it's silently ignored on
+// LAYERED windows, and acrylic forces this window transparent => layered.
+// What DOES work on a layered window is a GDI region clip: SetWindowRgn with a
+// round-rect region clips the whole window — web content AND the frosted
+// material — to the rounded shape. Trade-off: GDI regions have no
+// anti-aliasing, so the corners are slightly stair-stepped. Bound with koffi
+// (prebuilt FFI, no native compile). Unavailable off-Windows / if koffi fails
+// to load, in which case the CSS fallback in styles.css takes over.
+let _rgn = null;
+try {
+  if (process.platform === 'win32') {
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll');
+    const gdi32 = koffi.load('gdi32.dll');
+    _rgn = {
+      koffi,
+      SetWindowRgn: user32.func('int __stdcall SetWindowRgn(void *hWnd, void *hRgn, bool bRedraw)'),
+      CreateRoundRectRgn: gdi32.func('void* __stdcall CreateRoundRectRgn(int x1, int y1, int x2, int y2, int wEllipse, int hEllipse)'),
+    };
+  }
+} catch { _rgn = null; }
+const nativeRoundingAvailable = !!_rgn;
+const CORNER_RADIUS_DIP = 14; // matches the card / channel-row radius
+
+// Mirrors the renderer's roundedCorners setting; seeded from disk so the very
+// first paint is correct, then kept live via the window:set-rounded IPC.
+let wantRoundedCorners = !!((readPersistedSettings() || {}).roundedCorners);
+
+// Clip the window to a rounded-rect region (or clear it for a square window).
+// Squared off while maximized (a maximized rounded window would notch the
+// screen corners). The region is in PHYSICAL pixels, so scale by the display's
+// scaleFactor. Returns true when the native call succeeds.
+function applyWindowCorners() {
+  if (!nativeRoundingAvailable || !mainWindow || mainWindow.isDestroyed()) return false;
+  try {
+    const hwnd = _rgn.koffi.decode(mainWindow.getNativeWindowHandle(), 'void *');
+    const round = wantRoundedCorners && !mainWindow.isMaximized();
+    if (!round) {
+      _rgn.SetWindowRgn(hwnd, null, true); // null region => full square window
+      return true;
+    }
+    const [wDip, hDip] = mainWindow.getContentSize();
+    const sf = (screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor) || 1;
+    const W = Math.round(wDip * sf);
+    const H = Math.round(hDip * sf);
+    const d = Math.round(CORNER_RADIUS_DIP * sf) * 2; // ellipse axis = 2 * radius
+    const region = _rgn.CreateRoundRectRgn(0, 0, W + 1, H + 1, d, d);
+    // SetWindowRgn takes ownership of the region on success (and frees the
+    // previously-set one), so there's nothing to delete here.
+    const ok = _rgn.SetWindowRgn(hwnd, region, true);
+    return ok !== 0;
+  } catch { return false; }
+}
+
+// Tell the renderer whether the OS is handling the corners, so it can drop its
+// CSS-radius fallback (which would otherwise double-round against the region clip).
+function sendNativeRoundingState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('window:native-rounding', nativeRoundingAvailable && wantRoundedCorners);
+  }
+}
+
 // Tell Windows this is a distinct app (separate from generic Electron) so the
 // taskbar can group/pin it correctly with the Glass icon. Must be set early —
 // before BrowserWindow creation. The string is an "AppUserModelID".
@@ -108,6 +174,16 @@ function createWindow() {
   };
   mainWindow.on('maximize', sendMaxState);
   mainWindow.on('unmaximize', sendMaxState);
+
+  // Native rounded corners via SetWindowRgn (see applyWindowCorners above).
+  // The region is sized to the window, so re-apply on resize and maximize
+  // changes; re-assert on load and tell the renderer to drop its CSS fallback.
+  applyWindowCorners();
+  mainWindow.on('resize', applyWindowCorners);
+  mainWindow.on('maximize', applyWindowCorners);
+  mainWindow.on('unmaximize', applyWindowCorners);
+  mainWindow.webContents.on('did-finish-load', () => { applyWindowCorners(); sendNativeRoundingState(); });
+
   // The w2g WebContentsView is a child of this window's contentView, so it's
   // torn down with the window — drop our reference so a recreated window
   // doesn't try to reuse an orphaned view.
@@ -454,6 +530,17 @@ ipcMain.handle('window:set-material', (_e, material) => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+// Live toggle for rounded corners. Unlike transparency, DWM corner rounding
+// can be set at any time and works with the acrylic material on, so this needs
+// no restart on Win11. `native` tells the renderer whether the OS handled it
+// (false on Win10/older → renderer keeps its CSS-radius fallback).
+ipcMain.handle('window:set-rounded', (_e, rounded) => {
+  wantRoundedCorners = !!rounded;
+  const ok = applyWindowCorners();
+  sendNativeRoundingState();
+  return { ok, native: nativeRoundingAvailable };
 });
 
 // Relaunch the app — used when the user toggles Clear-glass mode, since

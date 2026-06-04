@@ -372,6 +372,11 @@ function applySettings(s) {
   root.style.setProperty('--bg-solid', t.bg || '#0a0612');
   root.dataset.glow = s.cardGlow ? 'true' : 'false';
   root.dataset.corners = s.roundedCorners ? 'rounded' : 'square';
+  // Ask the main process to round the actual OS window (DWM) — the only thing
+  // that rounds an acrylic/mica window, whose square OS material CSS can't
+  // touch. When that succeeds, onNativeRounding (wired at boot) sets
+  // data-native-round so the CSS-radius fallback below stands down.
+  window.app?.setRounded?.(!!s.roundedCorners);
   root.dataset.scrollbars = s.hideScrollbars ? 'hidden' : 'visible';
   root.dataset.passbtn = s.hidePassButton ? 'hidden' : 'visible';
   root.dataset.donate = s.hideDonateButton ? 'hidden' : 'visible';
@@ -5137,6 +5142,15 @@ document.getElementById('home-btn').onclick = () => go('home');
   };
   if (window.app?.onMaximizeChange) window.app.onMaximizeChange(setMaxUI);
 })();
+
+// When the main process rounds the window natively (DWM, Win11), flag it so the
+// CSS-radius fallback in styles.css stands down — otherwise the 14px CSS clip
+// would double-round against the OS corner and leave a sliver in each corner.
+if (window.app?.onNativeRounding) {
+  window.app.onNativeRounding((active) => {
+    document.documentElement.dataset.nativeRound = active ? '1' : '';
+  });
+}
 
 settingsBtn.onclick = showSettings;
 
