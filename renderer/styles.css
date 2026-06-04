@@ -10,8 +10,13 @@
   --glass-strong: rgba(255, 255, 255, var(--glass-strong-alpha));
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --text: #ece6ff;
-  --muted: #9b94b3;
+  /* Neutral (not lavender) text so non-purple themes — blue, ocean, mono, etc.
+     — don't inherit a purple cast (THEMES only swaps accent/bg/blobs, never
+     these). --muted is also brightened well up from the old #9b94b3 so
+     not-yet-selected items (home-mode tabs, secondary labels) stay readable
+     instead of fading into a dim purple-grey. */
+  --text: #eef0f4;
+  --muted: #bfc3cd;
   --accent: #c084fc;
   --accent-soft: rgba(192, 132, 252, 0.18);
 
