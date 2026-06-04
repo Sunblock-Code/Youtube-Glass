@@ -18,7 +18,8 @@
   --text: #eef0f4;
   --muted: #bfc3cd;
   --accent: #c084fc;
-  --accent-soft: rgba(192, 132, 252, 0.18);
+  --accent-rgb: 192, 132, 252; /* accent as r,g,b for rgba() tints — set per-theme in applySettings() */
+  --accent-soft: rgba(var(--accent-rgb), 0.18);
 
   --blob-1: #8b5cf6;
   --blob-2: #ec4899;
@@ -253,6 +254,15 @@ body {
 :root[data-bgmode="clear"] body {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.7);
 }
+/* …but that body shadow is only for bare labels floating over the desktop.
+   Inside SOLID surfaces (toasts, modal cards) it's just a heavy unwanted drop
+   shadow on the text — clear it there. */
+:root[data-bgmode="acrylic"] .install-banner, :root[data-bgmode="acrylic"] .install-banner *,
+:root[data-bgmode="clear"] .install-banner, :root[data-bgmode="clear"] .install-banner *,
+:root[data-bgmode="acrylic"] .modal-card *,
+:root[data-bgmode="clear"] .modal-card * {
+  text-shadow: none;
+}
 /* Solid (near-opaque) dark surfaces — by default these stay readable and
    DON'T let the desktop bleed through the content. Desktop shows only in
    the empty space around/between them.
@@ -427,7 +437,7 @@ body {
   animation: brandGlowAccent 5s ease-in-out infinite;
 }
 @keyframes brandGlow {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.30)); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.30)); }
   50%      { filter: drop-shadow(0 0 12px rgba(216, 180, 254, 0.65)); }
 }
 @keyframes brandGlowAccent {
@@ -581,7 +591,7 @@ body {
   background: var(--glass-strong);
   box-shadow:
     0 0 0 3px var(--accent-soft),
-    0 8px 24px rgba(192, 132, 252, 0.20),
+    0 8px 24px rgba(var(--accent-rgb), 0.20),
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 #search:focus::placeholder { color: rgba(255, 255, 255, 0.55); }
@@ -629,7 +639,7 @@ body {
 .topnav button.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.35);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 .topnav .icon-btn { width: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 /* Icon-only buttons (Subs/Shorts/History icons + watch-party, settings, Pass)
@@ -1451,14 +1461,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   text-transform: uppercase;
   letter-spacing: 4px;
   line-height: 1;
-  color: #f3eeff;
+  color: #eef0f4;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
-  text-shadow:
-    0 0 7px  color-mix(in srgb, var(--accent) 38%, transparent),
-    0 0 16px color-mix(in srgb, var(--accent) 20%, transparent);
-  will-change: filter;
-  animation: brandGlowAccent 5s ease-in-out infinite;
+  /* Softened from a pulsing double accent-glow to one faint static glow — the
+     bright animated bloom read as "extreme". Neutral text, gentle theme tint. */
+  text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* Comment composer — Piped is read-only so this drafts text in-app, copies
@@ -1543,15 +1551,15 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   background: var(--accent);
   border-color: transparent;
   color: #1a0a2e;
-  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.30);
 }
 .comment-composer-actions button.primary:hover {
   filter: brightness(1.06);
-  box-shadow: 0 6px 20px rgba(192, 132, 252, 0.45);
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.45);
 }
 .comment-composer-actions button.primary:active {
   filter: brightness(0.96);
-  box-shadow: 0 2px 8px rgba(192, 132, 252, 0.35);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.35);
 }
 
 /* Sort filter pills under the Comments header. No longer individually
@@ -1589,7 +1597,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .comment-filter.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: rgba(var(--accent-rgb), 0.40);
 }
 /* Hide filter row when comments panel is collapsed */
 .player-page.comments-collapsed .comment-filters { display: none; }
@@ -1659,7 +1667,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      that var goes low-alpha AND backdrop-filter is force-disabled, which left
      the menu transparent and unreadable. A solid dark base + heavier blur
      keeps it crisp and legible over any background. */
-  background: rgba(16, 11, 26, 0.97);
+  background: rgba(20, 22, 27, 0.97); /* neutral grey (was purple rgba(16,11,26)) */
   border: 1px solid var(--glass-border-strong, rgba(255, 255, 255, 0.18));
   border-radius: 12px;
   backdrop-filter: blur(60px) saturate(160%);
@@ -1805,7 +1813,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .related-tab.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent); /* theme accent (was hardcoded purple) */
 }
 /* Hide tabs in collapsed states — they belong to the expanded sidebar only.
    Mirrors the existing rules that hide .section-title when the panel sliver
@@ -1900,7 +1908,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   background: var(--accent);
   border-color: transparent;
   color: white;
-  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.30);
 }
 .topnav-style-btn.primary:hover {
   filter: brightness(1.06);
@@ -2456,7 +2464,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   padding: 10px 16px;
   margin-bottom: 18px;
   background: var(--accent-soft);
-  border: 1px solid rgba(192,132,252,0.30);
+  border: 1px solid rgba(var(--accent-rgb),0.30);
   border-radius: 12px;
   font-size: 12px;
   color: var(--text);
@@ -2919,14 +2927,14 @@ input[type="checkbox"].glass-check:checked::after {
   box-shadow:
     0 0 0 0 transparent,
     0 3px 8px rgba(0, 0, 0, 0.45),
-    0 0 12px rgba(192, 132, 252, 0.40);
+    0 0 12px rgba(var(--accent-rgb), 0.40);
   transition: box-shadow 0.15s, transform 0.1s;
 }
 .settings-slider::-webkit-slider-thumb:hover {
   box-shadow:
     0 0 0 6px var(--accent-soft),
     0 3px 8px rgba(0, 0, 0, 0.45),
-    0 0 16px rgba(192, 132, 252, 0.55);
+    0 0 16px rgba(var(--accent-rgb), 0.55);
 }
 .settings-slider:active::-webkit-slider-thumb {
   transform: scale(1.15);
@@ -2966,7 +2974,7 @@ input[type="checkbox"].glass-check:checked::after {
 .panel-tab.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: rgba(var(--accent-rgb), 0.40);
 }
 .panel-tab-split {
   width: 32px; height: 32px;
@@ -3134,7 +3142,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .related-col.drop-target {
   outline: 2px dashed var(--accent);
   outline-offset: -4px;
-  background: rgba(192, 132, 252, 0.10);
+  background: rgba(var(--accent-rgb), 0.10);
 }
 .comments-col[draggable="true"] .comments-header,
 .related-col[draggable="true"] .related-header { cursor: grab; }
@@ -3587,7 +3595,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .cc-opt-pills .theme-pill[data-cc-pb="neon"]:hover {
   border-color: var(--accent);
-  background: rgba(192, 132, 252, 0.10);
+  background: rgba(var(--accent-rgb), 0.10);
   box-shadow: 0 0 18px var(--accent), 0 0 8px var(--accent), 0 -4px 22px var(--accent-soft);
   color: white;
   text-shadow: 0 0 8px var(--accent);
@@ -3699,7 +3707,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .sub-btn:active {
   transform: translateY(0) scale(0.96);
   box-shadow:
-    0 2px 8px rgba(192, 132, 252, 0.4),
+    0 2px 8px rgba(var(--accent-rgb), 0.4),
     inset 0 2px 6px rgba(0, 0, 0, 0.2);
   transition-duration: 0.08s;
 }
@@ -4192,7 +4200,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .cc-dropdown-item.active {
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: rgba(var(--accent-rgb), 0.40);
   color: #fbcfe8;
 }
 .cc-dropdown-list::-webkit-scrollbar { width: 6px; }
@@ -4512,7 +4520,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .desc-toggle.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.35);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 .video-desc {
   padding: 8px 16px 14px;
@@ -4834,7 +4842,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   position: relative;
   width: 380px;
   max-width: calc(100vw - 40px);
-  background: rgba(20, 12, 30, 0.85);
+  background: rgba(22, 24, 29, 0.82); /* neutral grey (was purple rgba(20,12,30)) */
   border: 1px solid var(--glass-border-strong);
   border-radius: 20px;
   padding: 28px;
@@ -4858,7 +4866,14 @@ body.dragging-panel * { cursor: grabbing !important; }
    transparent-backdrop rule above. */
 :root[data-bgmode="acrylic"] .modal-card,
 :root[data-bgmode="clear"] .modal-card {
-  background: rgb(20, 12, 30) !important;
+  /* Neutral grey, translucent, and frosted so the modal reads as see-through
+     acrylic rather than an opaque purple sheet. backdrop-filter is re-enabled
+     here with !important to beat the see-through kill rule above — a modal is a
+     static overlay, so this one frosted layer doesn't trigger the scroll-time
+     re-raster glitch that the blanket disable guards against. */
+  background: rgba(24, 26, 31, 0.70) !important;
+  backdrop-filter: blur(34px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(140%) !important;
 }
 :root[data-bgmode="acrylic"] .modal-bg,
 :root[data-bgmode="clear"] .modal-bg,
@@ -4866,7 +4881,11 @@ body.dragging-panel * { cursor: grabbing !important; }
 :root[data-bgmode="clear"] .modal.settings-open .modal-bg,
 :root[data-bgmode="acrylic"] .modal:has(.modal-card.settings) .modal-bg,
 :root[data-bgmode="clear"] .modal:has(.modal-card.settings) .modal-bg {
-  background: rgba(4, 2, 8, 0.88) !important;
+  /* Acrylic blur of the app behind the modal (Settings included — this used to
+     be a near-opaque near-black dim), with a light neutral tint. */
+  background: rgba(10, 12, 16, 0.42) !important;
+  backdrop-filter: blur(22px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(135%) !important;
 }
 
 .modal h2 {
@@ -4949,7 +4968,8 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 .modal-actions button:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
 .modal-actions button.primary {
-  background: linear-gradient(135deg, #c084fc, #ec4899);
+  /* Theme accent (was a hardcoded purple→pink gradient that ignored the theme) */
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #000));
   border-color: transparent;
   color: white;
   font-weight: 600;
@@ -5066,8 +5086,8 @@ body.dragging-panel * { cursor: grabbing !important; }
    would pick up a stray purple border. */
 .auth-card .auth-icon:not(.google):not(.piped):not(.takeout) {
   color: var(--accent);
-  background: rgba(192, 132, 252, 0.12);
-  border: 1px solid rgba(192, 132, 252, 0.25);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
 }
 .auth-card .auth-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .auth-card .auth-text strong { font-size: 14px; font-weight: 600; }
@@ -5170,7 +5190,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   background: var(--accent);
   border-color: transparent;
   color: #1a0a2e;
-  box-shadow: 0 4px 14px rgba(192, 132, 252, 0.30);
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.30);
 }
 .xmr-addr-row button.primary:hover { filter: brightness(1.06); }
 .xmr-uri-msg {
@@ -5325,11 +5345,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 0 4px rgba(192,132,252,0.0), 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb),0.0), 0 2px 8px rgba(0,0,0,0.4);
   transition: box-shadow 0.15s;
 }
 .slider-row input[type="range"]::-webkit-slider-thumb:hover {
-  box-shadow: 0 0 0 6px rgba(192,132,252,0.18), 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 0 0 6px rgba(var(--accent-rgb),0.18), 0 2px 8px rgba(0,0,0,0.4);
 }
 .slider-val {
   min-width: 56px;
@@ -5345,8 +5365,8 @@ body.dragging-panel * { cursor: grabbing !important; }
 .install-banner {
   display: flex; align-items: center; gap: 16px;
   padding: 14px 18px;
-  background: rgba(192, 132, 252, 0.10);
-  border: 1px solid rgba(192, 132, 252, 0.28);
+  background: rgba(var(--accent-rgb), 0.10);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
   border-radius: 14px;
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
@@ -5532,7 +5552,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   overflow: hidden;
   isolation: isolate;
   box-shadow:
-    0 6px 18px rgba(192, 132, 252, 0.45),
+    0 6px 18px rgba(var(--accent-rgb), 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset,
     0 1px 0 rgba(255, 255, 255, 0.30) inset;
   transition: background-position 0.5s ease, box-shadow 0.25s ease,
@@ -5563,7 +5583,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   background-position: 100% 50%;
   transform: translateY(-1px);
   box-shadow:
-    0 10px 26px rgba(192, 132, 252, 0.55),
+    0 10px 26px rgba(var(--accent-rgb), 0.55),
     0 0 0 1px rgba(255, 255, 255, 0.10) inset,
     0 1px 0 rgba(255, 255, 255, 0.34) inset;
 }
@@ -5579,7 +5599,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   transform: translateY(0) scale(0.97);
   filter: brightness(0.95);
   box-shadow:
-    0 3px 10px rgba(192, 132, 252, 0.45),
+    0 3px 10px rgba(var(--accent-rgb), 0.45),
     inset 0 2px 5px rgba(0, 0, 0, 0.18);
 }
 
@@ -5594,9 +5614,9 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-btn { position: relative; }
 .wp-btn.active {
   color: var(--accent);
-  border-color: rgba(192, 132, 252, 0.40);
-  background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(236, 72, 153, 0.10));
-  box-shadow: 0 0 14px rgba(192, 132, 252, 0.25);
+  border-color: rgba(var(--accent-rgb), 0.40);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(236, 72, 153, 0.10));
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.25);
 }
 /* Peer-count badge — sits over the bottom-right of the topnav button.
    The previous solid 2 px dark ring (using --bg) read as a chunky black
@@ -5624,7 +5644,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.25),
     0 2px 5px rgba(0, 0, 0, 0.45),
-    0 0 10px rgba(192, 132, 252, 0.45);
+    0 0 10px rgba(var(--accent-rgb), 0.45);
 }
 .wp-badge[hidden] { display: none; }
 
@@ -5708,11 +5728,11 @@ body.dragging-panel * { cursor: grabbing !important; }
   background: var(--accent);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 6px 18px rgba(192, 132, 252, 0.28);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.28);
 }
 .wp-join-form .modal-btn.primary:hover:not(:disabled) {
   filter: brightness(1.07);
-  box-shadow: 0 8px 22px rgba(192, 132, 252, 0.40);
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb), 0.40);
 }
 .wp-join-form .modal-btn:active:not(:disabled) { transform: scale(0.97); }
 .wp-join-form .modal-btn:disabled { opacity: 0.55; cursor: default; }
@@ -5738,7 +5758,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .wp-tab.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: rgba(var(--accent-rgb), 0.40);
 }
 .wp-tab-pane { display: none; }
 .wp-tab-pane.active { display: block; }
@@ -5765,6 +5785,18 @@ body.dragging-panel * { cursor: grabbing !important; }
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .wp-w2g-input-row .modal-btn { flex-shrink: 0; height: 38px; padding: 0 18px; }
+.wp-w2g-input-row .modal-btn.primary {
+  /* Was effectively unstyled (only sized) → give "Open" the same theme-accent
+     look as the modal's other primary buttons so it reads as the main action. */
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #000));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.28);
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.wp-w2g-input-row .modal-btn.primary:hover { filter: brightness(1.08); box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.42); }
+.wp-w2g-input-row .modal-btn.primary:active { transform: scale(0.97); }
 .wp-w2g-hint {
   font-size: 11px;
   color: var(--muted);
@@ -5856,14 +5888,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   gap: 10px;
   margin-top: 14px;
   padding: 10px 14px;
-  background: rgba(192, 132, 252, 0.10);
-  border: 1px solid rgba(192, 132, 252, 0.28);
+  background: rgba(var(--accent-rgb), 0.10);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
   border-radius: 10px;
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.2px;
-  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.08);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.08);
   animation: wpMsgIn 0.18s ease-out;
 }
 .wp-msg[data-kind="loading"]::before {
@@ -6079,7 +6111,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.35));
+  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.35));
 }
 .wp-peers-count {
   font-size: 28px;
@@ -6144,8 +6176,8 @@ body.dragging-panel * { cursor: grabbing !important; }
   color: #93c5fd;
 }
 .wp-action-switch {
-  background: rgba(192, 132, 252, 0.12);
-  border-color: rgba(192, 132, 252, 0.32);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.32);
   color: #d8b4fe;
 }
 .wp-tip-text {
@@ -6227,7 +6259,7 @@ body.dragging-panel * { cursor: grabbing !important; }
 .comments-tab.active {
   color: var(--text);
   background: var(--accent-soft);
-  border-color: rgba(192, 132, 252, 0.40);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent); /* theme accent (was hardcoded purple) */
 }
 .chat-tab-dot {
   display: inline-block;
@@ -6307,7 +6339,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   letter-spacing: 0.4px;
   cursor: pointer;
   transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
-  box-shadow: 0 6px 18px rgba(192, 132, 252, 0.28);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.28);
 }
 .chat-empty .modal-btn.primary:hover { filter: brightness(1.07); }
 .chat-empty .modal-btn.primary:active { transform: scale(0.97); }
@@ -6333,8 +6365,8 @@ body.dragging-panel * { cursor: grabbing !important; }
   max-width: 92%;
 }
 .chat-msg.own {
-  background: rgba(192, 132, 252, 0.08);
-  border-color: rgba(192, 132, 252, 0.22);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.22);
   align-self: flex-end;
 }
 .chat-msg-meta {
@@ -6419,7 +6451,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   justify-content: center;
   flex-shrink: 0;
   transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
-  box-shadow: 0 4px 12px rgba(192, 132, 252, 0.28);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.28);
 }
 .chat-composer button:hover:not(:disabled) { filter: brightness(1.07); }
 .chat-composer button:active:not(:disabled) { transform: scale(0.95); }

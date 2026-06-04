@@ -320,6 +320,11 @@ function applySettings(s) {
   const t = THEMES[s.theme] || THEMES.purple;
   root.style.setProperty('--accent',      t.accent);
   root.style.setProperty('--accent-soft', t.accentSoft);
+  // Expose the accent as an "r, g, b" triplet so the many rgba(var(--accent-rgb), α)
+  // tints/borders/glows in styles.css follow the active theme instead of being a
+  // hardcoded purple (which read as an out-of-place purple cast on every theme).
+  const _am = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((t.accent || '').trim());
+  if (_am) root.style.setProperty('--accent-rgb', `${parseInt(_am[1], 16)}, ${parseInt(_am[2], 16)}, ${parseInt(_am[3], 16)}`);
   root.style.setProperty('--blob-1',      t.blob1);
   root.style.setProperty('--blob-2',      t.blob2);
   root.style.setProperty('--blob-3',      t.blob3);
@@ -6565,7 +6570,6 @@ function showWatchPartyStart() {
         <button class="wp-w2g-row-ext" type="button" data-ext="${escapeAttr(r.url)}" aria-label="Open in real browser" title="Open in your default browser (where w2g's extension can run)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </button>
-        <button class="wp-w2g-row-del" type="button" data-del="${escapeAttr(r.url)}" aria-label="Remove from saved" title="Remove">×</button>
       </div>
     `).join('');
     el.querySelectorAll('.wp-w2g-row-go').forEach(b => {
@@ -6578,8 +6582,29 @@ function showWatchPartyStart() {
         if (url) { try { window.app?.openExternal?.(url) || window.open(url, '_blank'); } catch {} }
       };
     });
-    el.querySelectorAll('.wp-w2g-row-del').forEach(b => {
-      b.onclick = (e) => { e.stopPropagation(); w2gRemoveSavedRoom(b.dataset.del); renderW2GSaved(); };
+    // Right-click a saved room → context menu with Remove (replaces the old × button).
+    // Reuses the .video-context-menu styling + _videoCtxMenu so the shared
+    // click-away / scroll / Escape dismissal handlers close it for free.
+    el.querySelectorAll('.wp-w2g-row').forEach(row => {
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // keep the global card contextmenu handler from closing this
+        hideVideoContextMenu();
+        const url = row.dataset.url;
+        const menu = document.createElement('div');
+        menu.className = 'video-context-menu';
+        menu.innerHTML = `
+          <button type="button" data-act="rm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+            Remove from saved
+          </button>`;
+        document.body.appendChild(menu);
+        const rect = menu.getBoundingClientRect();
+        menu.style.left = Math.max(6, Math.min(e.clientX, innerWidth - rect.width - 8)) + 'px';
+        menu.style.top = Math.max(6, Math.min(e.clientY, innerHeight - rect.height - 8)) + 'px';
+        menu.querySelector('[data-act="rm"]').onclick = () => { hideVideoContextMenu(); w2gRemoveSavedRoom(url); renderW2GSaved(); };
+        _videoCtxMenu = menu;
+      });
     });
   };
   renderW2GSaved();
