@@ -41,61 +41,48 @@ const launchedTransparent = (() => {
   return !!(s && (SEE_THROUGH_MODES.includes(s.bgMode) || s.roundedCorners));
 })();
 
-// --- Native window corner rounding (Windows) ------------------------------
+// --- Native window corner rounding (Windows 11) ---------------------------
 // CSS border-radius can't round the window when the acrylic/mica MATERIAL is
-// active: Windows paints that frosted material across the full SQUARE window
-// rect, behind the web content, where CSS can't reach. DWM's corner rounding
-// (DWMWA_WINDOW_CORNER_PREFERENCE) is ALSO out — it's silently ignored on
-// LAYERED windows, and acrylic forces this window transparent => layered.
-// What DOES work on a layered window is a GDI region clip: SetWindowRgn with a
-// round-rect region clips the whole window — web content AND the frosted
-// material — to the rounded shape. Trade-off: GDI regions have no
-// anti-aliasing, so the corners are slightly stair-stepped. Bound with koffi
-// (prebuilt FFI, no native compile). Unavailable off-Windows / if koffi fails
-// to load, in which case the CSS fallback in styles.css takes over.
-let _rgn = null;
+// active — Windows paints that frosted material across the full SQUARE window
+// rect, where CSS can't reach. A GDI region clip (SetWindowRgn) rounds the web
+// content but NOT the DWM-composited backdrop, so the frosted corners stay
+// square (confirmed). The thing that rounds the backdrop too is DWM's own
+// corner preference: DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND, which
+// rounds the whole composited window at the standard Win11 radius. Bound via
+// koffi (prebuilt FFI, no native compile). Win11 only; no-op otherwise.
+let _dwm = null;
 try {
   if (process.platform === 'win32') {
     const koffi = require('koffi');
-    const user32 = koffi.load('user32.dll');
-    const gdi32 = koffi.load('gdi32.dll');
-    _rgn = {
+    const dwmapi = koffi.load('dwmapi.dll');
+    _dwm = {
       koffi,
-      SetWindowRgn: user32.func('int __stdcall SetWindowRgn(void *hWnd, void *hRgn, bool bRedraw)'),
-      CreateRoundRectRgn: gdi32.func('void* __stdcall CreateRoundRectRgn(int x1, int y1, int x2, int y2, int wEllipse, int hEllipse)'),
+      DwmSetWindowAttribute: dwmapi.func('int __stdcall DwmSetWindowAttribute(void *hwnd, uint32_t attr, void *pvAttr, uint32_t cb)'),
     };
   }
-} catch { _rgn = null; }
-const nativeRoundingAvailable = !!_rgn;
-const CORNER_RADIUS_DIP = 14; // matches the card / channel-row radius
+} catch { _dwm = null; }
+const nativeRoundingAvailable = !!_dwm;
+const DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+const DWMWCP_DONOTROUND = 1;
+const DWMWCP_ROUND = 2;
 
 // Mirrors the renderer's roundedCorners setting; seeded from disk so the very
 // first paint is correct, then kept live via the window:set-rounded IPC.
 let wantRoundedCorners = !!((readPersistedSettings() || {}).roundedCorners);
 
-// Clip the window to a rounded-rect region (or clear it for a square window).
-// Squared off while maximized (a maximized rounded window would notch the
-// screen corners). The region is in PHYSICAL pixels, so scale by the display's
-// scaleFactor. Returns true when the native call succeeds.
+// Ask DWM to round (or square) the window corners. Squared while maximized (a
+// maximized rounded window would notch the screen corners). DWM rounds the
+// whole composited window — the frosted acrylic backdrop included. Returns true
+// when the call succeeds (S_OK).
 function applyWindowCorners() {
   if (!nativeRoundingAvailable || !mainWindow || mainWindow.isDestroyed()) return false;
   try {
-    const hwnd = _rgn.koffi.decode(mainWindow.getNativeWindowHandle(), 'void *');
+    const hwnd = _dwm.koffi.decode(mainWindow.getNativeWindowHandle(), 'void *');
     const round = wantRoundedCorners && !mainWindow.isMaximized();
-    if (!round) {
-      _rgn.SetWindowRgn(hwnd, null, true); // null region => full square window
-      return true;
-    }
-    const [wDip, hDip] = mainWindow.getContentSize();
-    const sf = (screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor) || 1;
-    const W = Math.round(wDip * sf);
-    const H = Math.round(hDip * sf);
-    const d = Math.round(CORNER_RADIUS_DIP * sf) * 2; // ellipse axis = 2 * radius
-    const region = _rgn.CreateRoundRectRgn(0, 0, W + 1, H + 1, d, d);
-    // SetWindowRgn takes ownership of the region on success (and frees the
-    // previously-set one), so there's nothing to delete here.
-    const ok = _rgn.SetWindowRgn(hwnd, region, true);
-    return ok !== 0;
+    const pref = Buffer.alloc(4);
+    pref.writeInt32LE(round ? DWMWCP_ROUND : DWMWCP_DONOTROUND, 0);
+    const hr = _dwm.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, pref, 4);
+    return hr === 0;
   } catch { return false; }
 }
 
@@ -526,6 +513,14 @@ ipcMain.handle('window:set-material', (_e, material) => {
       const keepClear = launchedTransparent || m !== 'none';
       mainWindow.setBackgroundColor(keepClear ? '#00000000' : '#0a0612');
     }
+    // Re-assert the rounded-corner region AFTER changing the material. The
+    // renderer calls this on EVERY settings change (theme, comments placement,
+    // …), and setBackgroundMaterial re-establishes the DWM backdrop across the
+    // full square window — refilling the corners the region had clipped. Without
+    // this, rounded corners silently went square after any settings tweak. Clip
+    // again now, and once more after the backdrop settles.
+    applyWindowCorners();
+    setTimeout(() => { try { applyWindowCorners(); } catch {} }, 60);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
