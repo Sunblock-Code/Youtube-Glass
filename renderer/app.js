@@ -5118,7 +5118,10 @@ search.addEventListener('keydown', e => {
     const w2g = w2gUrlFromAny(q);
     if (w2g) {
       search.value = '';
-      go('w2g', w2g);
+      // W2G sync needs their browser extension (real browser only), so open the
+      // room in the default browser instead of the in-app embed. Save it too.
+      w2gSaveRoom(w2g);
+      window.app?.openExternal?.(w2g);
       return;
     }
     go('search', q);
@@ -6454,7 +6457,7 @@ function showWatchPartyStart() {
         <input type="text" id="wp-w2g-url" placeholder="https://w2g.tv/en/room/?room_id=…" autocomplete="off" spellcheck="false" />
         <button id="wp-w2g-open" class="modal-btn primary" type="button">Open</button>
       </div>
-      <div class="wp-w2g-hint">Paste a Watch2Gether room link — it opens docked in the panel, stripped to just the video.</div>
+      <div class="wp-w2g-hint">Paste a Watch2Gether room link — it opens in your browser, where W2G's sync extension works (it can't run inside Glass).</div>
       <div class="wp-w2g-saved-title">Saved rooms</div>
       <div class="wp-w2g-saved" id="wp-w2g-saved"></div>
       <div id="wp-w2g-msg" class="hint wp-msg"></div>
@@ -6585,24 +6588,16 @@ function showWatchPartyStart() {
     }
     el.innerHTML = list.map(r => `
       <div class="wp-w2g-row" data-url="${escapeAttr(r.url)}">
-        <button class="wp-w2g-row-go" type="button" title="Open in Glass">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16" fill="currentColor" stroke="none"/></svg>
+        <button class="wp-w2g-row-go" type="button" title="Open in your browser — W2G's sync needs your browser extension, which only runs there">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           <span class="wp-w2g-row-name">${escape(r.name || 'Watch2Gether room')}</span>
-        </button>
-        <button class="wp-w2g-row-ext" type="button" data-ext="${escapeAttr(r.url)}" aria-label="Open in real browser" title="Open in your default browser (where w2g's extension can run)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </button>
       </div>
     `).join('');
     el.querySelectorAll('.wp-w2g-row-go').forEach(b => {
-      b.onclick = () => { const url = b.closest('.wp-w2g-row').dataset.url; closeModal(); go('w2g', url); };
-    });
-    el.querySelectorAll('.wp-w2g-row-ext').forEach(b => {
-      b.onclick = (e) => {
-        e.stopPropagation();
-        const url = b.dataset.ext;
-        if (url) { try { window.app?.openExternal?.(url) || window.open(url, '_blank'); } catch {} }
-      };
+      // Open the room in the default browser — W2G's sync needs their browser
+      // extension, which can't run in the app's embedded view.
+      b.onclick = () => { const url = b.closest('.wp-w2g-row').dataset.url; closeModal(); window.app?.openExternal?.(url); };
     });
     // Right-click a saved room → context menu with Remove (replaces the old × button).
     // Reuses the .video-context-menu styling + _videoCtxMenu so the shared
@@ -6639,7 +6634,7 @@ function showWatchPartyStart() {
     if (!valid) { setW2gMsg("That doesn't look like a w2g.tv link.", 'error'); w2gInput?.focus(); return; }
     w2gSaveRoom(valid);
     closeModal();
-    go('w2g', valid);
+    window.app?.openExternal?.(valid); // open in the browser — W2G sync needs the extension (real browser only)
   };
   modalBody.querySelector('#wp-w2g-open')?.addEventListener('click', w2gOpen);
   w2gInput?.addEventListener('keydown', (ev) => {
