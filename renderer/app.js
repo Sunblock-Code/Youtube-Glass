@@ -598,6 +598,9 @@ function updateQueueBadges() {
   document.querySelectorAll('.related-tab[data-rt="queue"]').forEach(t => {
     t.textContent = n ? `Queue (${n})` : 'Queue';
   });
+  // Count badge on the topnav Queue button.
+  const tc = document.getElementById('topnav-queue-count');
+  if (tc) { tc.textContent = n > 99 ? '99+' : String(n); tc.hidden = n === 0; }
 }
 // Build a queue item from a video card / row DOM node (we don't always have the
 // original data object at right-click time, so read what the card shows).
@@ -775,6 +778,7 @@ async function go(route, ...args) {
     else if (route === 'subs')    await renderSubs();
     else if (route === 'shorts')  await renderShorts();
     else if (route === 'history') await renderHistory();
+    else if (route === 'queue')   await renderQueue();
     else if (route === 'channel') await renderChannel(args[0]);
     else view.innerHTML = `<div class="empty">Not found</div>`;
   } catch (e) {
@@ -1911,6 +1915,39 @@ async function renderHistory() {
     if (!confirm(`Clear all ${hist.length} videos from your watch history?`)) return;
     clearHistory();
     go('history');
+  };
+}
+
+// Full-page Queue view (topnav Queue button). Mirrors the sidebar Queue tab —
+// same queueRow rows + click-to-play / × remove — but as its own page so the
+// queue is reachable anywhere, not just while watching a video.
+async function renderQueue() {
+  const items = getQueue();
+  if (!items.length) {
+    view.innerHTML = `<div class="empty">Your queue is empty — right-click any video → Add to queue.</div>`;
+    return;
+  }
+  view.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <h2 class="section-title" style="margin:0;flex:1">Queue · ${items.length}</h2>
+      <button id="queue-clear" class="topnav-style-btn">Clear queue</button>
+    </div>
+    <div class="related" id="queue-page-list" style="max-width:780px">${items.map(queueRow).join('')}</div>
+  `;
+  const list = view.querySelector('#queue-page-list');
+  list.querySelectorAll('.queue-row').forEach(r => {
+    r.addEventListener('click', (e) => {
+      if (e.target.closest('.queue-row-del')) return;
+      go('video', r.dataset.id);
+    });
+  });
+  list.querySelectorAll('.queue-row-del').forEach(b => {
+    b.addEventListener('click', (e) => { e.stopPropagation(); queueRemove(b.dataset.qdel); renderQueue(); });
+  });
+  view.querySelector('#queue-clear').onclick = () => {
+    if (!confirm(`Clear all ${items.length} from your queue?`)) return;
+    setQueue([]);
+    renderQueue();
   };
 }
 

@@ -637,6 +637,26 @@ body {
 
 :root[data-topnav="both"] .topnav button[data-route] .topnav-icon { display: inline-block; }
 :root[data-topnav="both"] .topnav button[data-route] { padding: 0 14px; }
+/* Count badge on the topnav Queue button (filled by updateQueueBadges). */
+.topnav button[data-route="queue"] { position: relative; }
+.topnav-queue-count {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.topnav-queue-count[hidden] { display: none; }
 .topnav button.active {
   color: var(--text);
   background: var(--accent-soft);
