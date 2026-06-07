@@ -318,6 +318,41 @@ async function rehydrateSettingsFromFile() {
   } catch {}
 }
 
+// Top-bar (topnav) button registry. The "Buttons" settings tab drag-reorders
+// these and toggles them on/off; order + state persist in settings.navButtons
+// as [{key, on}, …]. New buttons not yet in the saved list are appended (on).
+const NAV_BUTTONS = [
+  { key: 'subs',    label: 'Subs' },
+  { key: 'shorts',  label: 'Shorts' },
+  { key: 'history', label: 'History' },
+  { key: 'queue',   label: 'Queue' },
+];
+function resolveNavButtons(s) {
+  const stored = Array.isArray(s && s.navButtons) ? s.navButtons : [];
+  const byKey = new Map(NAV_BUTTONS.map(b => [b.key, b]));
+  const out = [], seen = new Set();
+  for (const it of stored) {
+    if (it && byKey.has(it.key) && !seen.has(it.key)) {
+      out.push({ ...byKey.get(it.key), on: it.on !== false });
+      seen.add(it.key);
+    }
+  }
+  for (const b of NAV_BUTTONS) if (!seen.has(b.key)) out.push({ ...b, on: true });
+  return out;
+}
+// Reorder + show/hide the real topnav buttons to match the saved config.
+function applyNavButtons(s) {
+  const topnav = document.querySelector('.topnav');
+  if (!topnav) return;
+  const donate = document.getElementById('donate-btn'); // keep donate last
+  for (const b of resolveNavButtons(s)) {
+    const btn = topnav.querySelector(`button[data-route="${b.key}"]`);
+    if (!btn) continue;
+    btn.style.display = b.on ? '' : 'none';
+    if (donate) topnav.insertBefore(btn, donate); else topnav.appendChild(btn);
+  }
+}
+
 function applySettings(s) {
   const root = document.documentElement;
   const t = THEMES[s.theme] || THEMES.purple;
@@ -397,6 +432,7 @@ function applySettings(s) {
     _searchEl.placeholder = s.hideSearchPlaceholder ? '' : _searchEl.dataset.ph;
   }
   root.dataset.topnav = ['text', 'icon', 'both'].includes(s.topnavStyle) ? s.topnavStyle : 'text';
+  applyNavButtons(s); // order + on/off of the topnav buttons (Settings → Buttons)
   root.dataset.heatmap = s.showHeatmap === false ? 'off' : 'on';
   root.dataset.subsBelow = s.subtitlesBelow ? '1' : ''; // captions: box below video vs on-video overlay
   root.style.setProperty('--related-width', (s.relatedWidth || 380) + 'px');
@@ -5248,6 +5284,7 @@ function showSettings() {
         <button class="settings-tab" data-tab="glass" role="tab"><span class="dot"></span>Glass &amp; Opacity</button>
         <button class="settings-tab" data-tab="behavior" role="tab"><span class="dot"></span>Behavior</button>
         <button class="settings-tab" data-tab="pullout" role="tab"><span class="dot"></span>Slide-out</button>
+        <button class="settings-tab" data-tab="buttons" role="tab"><span class="dot"></span>Buttons</button>
       </nav>
 
       <div class="settings-panes">
@@ -5459,6 +5496,17 @@ function showSettings() {
                 <div class="hint" id="s-pull-msg" style="margin-top:6px">Default: Alt+T</div>
               </div>
             </div>
+          </section>
+        </div>
+
+        <div class="settings-pane" data-pane="buttons" role="tabpanel">
+          <section class="settings-section">
+            <h3><span class="dot"></span>Top-bar buttons</h3>
+            <div class="hint" style="margin-bottom:10px">Drag a button between the boxes to turn it on or off. Drag within the top box to change the order they appear in.</div>
+            <div class="settings-label">Enabled · in order</div>
+            <div class="btn-mgr-zone btn-mgr-on" id="btn-mgr-on" data-zone="on"></div>
+            <div class="settings-label" style="margin-top:12px">Disabled</div>
+            <div class="btn-mgr-zone btn-mgr-off" id="btn-mgr-off" data-zone="off"></div>
           </section>
         </div>
 
@@ -5722,6 +5770,55 @@ function showSettings() {
   modalBody.querySelector('#s-hide-searchhint').onchange = (e) => {
     update({ hideSearchHint: e.target.checked });
   };
+
+  // --- Buttons manager (Settings → Buttons): drag chips between the Enabled /
+  // Disabled boxes to toggle, and drag within a box to reorder. On every drop
+  // we serialize the DOM order of both zones into settings.navButtons. ---
+  (function setupButtonsManager() {
+    const onZone  = modalBody.querySelector('#btn-mgr-on');
+    const offZone = modalBody.querySelector('#btn-mgr-off');
+    if (!onZone || !offZone) return;
+    const serialize = () => {
+      const out = [];
+      onZone.querySelectorAll('.btn-chip').forEach(c => out.push({ key: c.dataset.key, on: true }));
+      offZone.querySelectorAll('.btn-chip').forEach(c => out.push({ key: c.dataset.key, on: false }));
+      update({ navButtons: out });
+    };
+    const makeChip = (b) => {
+      const chip = document.createElement('div');
+      chip.className = 'btn-chip';
+      chip.draggable = true;
+      chip.dataset.key = b.key;
+      const ic = document.querySelector(`.topnav button[data-route="${b.key}"] .topnav-icon`);
+      chip.innerHTML = `<span class="btn-chip-grip" aria-hidden="true">⠿</span>${ic ? ic.outerHTML : ''}<span class="btn-chip-label">${escape(b.label)}</span>`;
+      chip.addEventListener('dragstart', () => chip.classList.add('dragging'));
+      chip.addEventListener('dragend', () => { chip.classList.remove('dragging'); serialize(); });
+      return chip;
+    };
+    for (const b of resolveNavButtons(currentSettings)) {
+      (b.on ? onZone : offZone).appendChild(makeChip(b));
+    }
+    // Find the chip the cursor is above (for vertical reorder/insertion).
+    const afterEl = (zone, y) => {
+      let best = null, bestOffset = -Infinity;
+      zone.querySelectorAll('.btn-chip:not(.dragging)').forEach(c => {
+        const box = c.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > bestOffset) { bestOffset = offset; best = c; }
+      });
+      return best;
+    };
+    [onZone, offZone].forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = modalBody.querySelector('.btn-chip.dragging');
+        if (!dragging) return;
+        const after = afterEl(zone, e.clientY);
+        if (after == null) zone.appendChild(dragging);
+        else zone.insertBefore(dragging, after);
+      });
+    });
+  })();
 
   // --- Download folder picker ---
   const dlInput = modalBody.querySelector('#s-dldir');
