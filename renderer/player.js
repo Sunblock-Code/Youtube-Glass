@@ -9,7 +9,17 @@ export function play(videoEl, streams) {
       return;
     }
     if (window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+      const hls = new window.Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        // Don't fetch a higher resolution than the player is actually showing
+        // (no 4K decoded into a 700px panel) — big bandwidth saver, faster
+        // starts, and fewer stalls because each second of video is smaller.
+        capLevelToPlayerSize: true,
+        // Cap the retained back-buffer (hls.js keeps the entire watched portion
+        // by default) so memory/data held doesn't grow unbounded on long videos.
+        backBufferLength: 30,
+      });
       hls.loadSource(streams.hls);
       hls.attachMedia(videoEl);
       videoEl._hls = hls;
@@ -20,6 +30,22 @@ export function play(videoEl, streams) {
   // 2. DASH manifest via dash.js — what unlocks adaptive HD on YouTube VOD.
   if (streams.dash && window.dashjs?.MediaPlayer) {
     const dash = window.dashjs.MediaPlayer().create();
+    try {
+      dash.updateSettings({
+        streaming: {
+          abr: {
+            // Cap quality to the on-screen player size (accounting for DPR)
+            // instead of pulling the highest manifest rendition into a small
+            // panel — less data, faster start, fewer rebuffers.
+            limitBitrateByPortal: true,
+            usePixelRatioInLimitBitrateByPortal: true,
+          },
+          // Jump up a rendition promptly once bandwidth allows (snappier than
+          // waiting for the current buffer to drain first).
+          buffer: { fastSwitchEnabled: true },
+        },
+      });
+    } catch {}
     dash.initialize(videoEl, streams.dash, /* autoplay */ true);
     videoEl._dash = dash;
     return;
