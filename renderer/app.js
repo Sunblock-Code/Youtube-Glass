@@ -217,6 +217,8 @@ const DEFAULT_SETTINGS = {
   hidePassButton: false,
   hideDonateButton: false,
   searchStyle: 'pill',   // 'pill' | 'square'
+  hideSearchPlaceholder: false, // blank out the search box's "Search or paste…" placeholder
+  hideSearchHint: false,        // hide the "Ctrl K" badge in the search box
   topnavStyle: 'text',   // 'text' | 'icon' | 'both' — Subs/Shorts/History buttons
   includeChannelInFilename: false,
   downloadDir: '',                 // empty = use platform default (Downloads/YouTube)
@@ -387,6 +389,13 @@ function applySettings(s) {
   root.dataset.passbtn = s.hidePassButton ? 'hidden' : 'visible';
   root.dataset.donate = s.hideDonateButton ? 'hidden' : 'visible';
   root.dataset.search = s.searchStyle === 'square' ? 'square' : 'pill';
+  // Optional: blank the search placeholder text / hide the Ctrl-K badge.
+  root.dataset.searchhint = s.hideSearchHint ? 'hidden' : 'shown';
+  const _searchEl = document.getElementById('search');
+  if (_searchEl) {
+    if (_searchEl.dataset.ph == null) _searchEl.dataset.ph = _searchEl.getAttribute('placeholder') || '';
+    _searchEl.placeholder = s.hideSearchPlaceholder ? '' : _searchEl.dataset.ph;
+  }
   root.dataset.topnav = ['text', 'icon', 'both'].includes(s.topnavStyle) ? s.topnavStyle : 'text';
   root.dataset.heatmap = s.showHeatmap === false ? 'off' : 'on';
   root.dataset.subsBelow = s.subtitlesBelow ? '1' : ''; // captions: box below video vs on-video overlay
@@ -5118,10 +5127,8 @@ search.addEventListener('keydown', e => {
     const w2g = w2gUrlFromAny(q);
     if (w2g) {
       search.value = '';
-      // W2G sync needs their browser extension (real browser only), so open the
-      // room in the default browser instead of the in-app embed. Save it too.
       w2gSaveRoom(w2g);
-      window.app?.openExternal?.(w2g);
+      go('w2g', w2g); // open in the embedded panel (experimental in-app sync)
       return;
     }
     go('search', q);
@@ -5253,6 +5260,14 @@ function showSettings() {
                     <button class="theme-pill ${s.searchStyle === 'pill' ? 'active' : ''}" data-search="pill">Pill</button>
                     <button class="theme-pill ${s.searchStyle === 'square' ? 'active' : ''}" data-search="square">Soft square</button>
                   </div>
+                  <label class="check-row" style="margin-top:10px">
+                    <input type="checkbox" id="s-hide-searchph" ${s.hideSearchPlaceholder ? 'checked' : ''} class="glass-check" />
+                    Hide search placeholder text
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" id="s-hide-searchhint" ${s.hideSearchHint ? 'checked' : ''} class="glass-check" />
+                    Hide the “Ctrl K” hint
+                  </label>
 
                   <div class="settings-label">Subs / Shorts / History buttons</div>
                   <div class="theme-options">
@@ -5663,6 +5678,12 @@ function showSettings() {
   };
   modalBody.querySelector('#s-channelfn').onchange = (e) => {
     update({ includeChannelInFilename: e.target.checked });
+  };
+  modalBody.querySelector('#s-hide-searchph').onchange = (e) => {
+    update({ hideSearchPlaceholder: e.target.checked });
+  };
+  modalBody.querySelector('#s-hide-searchhint').onchange = (e) => {
+    update({ hideSearchHint: e.target.checked });
   };
 
   // --- Download folder picker ---
@@ -6595,9 +6616,7 @@ function showWatchPartyStart() {
       </div>
     `).join('');
     el.querySelectorAll('.wp-w2g-row-go').forEach(b => {
-      // Open the room in the default browser — W2G's sync needs their browser
-      // extension, which can't run in the app's embedded view.
-      b.onclick = () => { const url = b.closest('.wp-w2g-row').dataset.url; closeModal(); window.app?.openExternal?.(url); };
+      b.onclick = () => { const url = b.closest('.wp-w2g-row').dataset.url; closeModal(); go('w2g', url); };
     });
     // Right-click a saved room → context menu with Remove (replaces the old × button).
     // Reuses the .video-context-menu styling + _videoCtxMenu so the shared
@@ -6634,7 +6653,7 @@ function showWatchPartyStart() {
     if (!valid) { setW2gMsg("That doesn't look like a w2g.tv link.", 'error'); w2gInput?.focus(); return; }
     w2gSaveRoom(valid);
     closeModal();
-    window.app?.openExternal?.(valid); // open in the browser — W2G sync needs the extension (real browser only)
+    go('w2g', valid); // open in the embedded panel (experimental in-app sync)
   };
   modalBody.querySelector('#wp-w2g-open')?.addEventListener('click', w2gOpen);
   w2gInput?.addEventListener('keydown', (ev) => {

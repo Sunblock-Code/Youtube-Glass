@@ -599,6 +599,7 @@ body {
 /* Search shape variant: soft square */
 :root[data-search="square"] #search { border-radius: 12px; }
 :root[data-search="square"] .search-hint { border-radius: 6px; }
+:root[data-searchhint="hidden"] .search-hint { display: none; } /* Settings → Components → "Hide the Ctrl K hint" */
 
 .topnav { display: flex; gap: 4px; align-items: center; }
 .topnav button {
