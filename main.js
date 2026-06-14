@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const { setupAdblock } = require('./adblock');
 const ytdlp = require('./ytdlp');
+const ffmpeg = require('./ffmpeg');
 const auth = require('./auth');
 
 // Electron's `transparent` is fixed at window-creation time — it can't be
@@ -357,8 +358,17 @@ function destroyW2gView() {
   try { w2gView.webContents.destroy(); } catch {}
   w2gView = null;
 }
+// TEMP RECON logger — appends to userData/w2g-ws-capture.log. Module-level so
+// we can log from the handler top (every open) AND the frame listener.
+function _w2gRecon(line) {
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'w2g-ws-capture.log'),
+      new Date().toISOString() + ' [W2G-WS] ' + line + '\n');
+  } catch {}
+}
 ipcMain.handle('w2g:open', (_e, url, mode) => {
-  if (!mainWindow || mainWindow.isDestroyed() || !isW2gHost(url)) return false;
+  _w2gRecon('w2g:open fired url=' + url + ' mode=' + mode); // proves the embed open was reached
+  if (!mainWindow || mainWindow.isDestroyed() || !isW2gHost(url)) { _w2gRecon('w2g:open REJECTED (no window or not a w2g host)'); return false; }
   if (!w2gView) {
     w2gView = new WebContentsView({
       webPreferences: { partition: 'persist:w2g', autoplayPolicy: 'no-user-gesture-required' },
@@ -387,6 +397,23 @@ ipcMain.handle('w2g:open', (_e, url, mode) => {
         w2gView.webContents.executeJavaScript(W2G_JUST_VIDEO_JS).catch(() => {});
       }
     });
+    // TEMP RECON: capture w2g's realtime sync over its websocket via the Chrome
+    // DevTools Protocol (Network domain). This records EVERY frame — including
+    // sockets opened inside web workers or before any injected JS could wrap
+    // window.WebSocket — which a JS shim misses. → userData/w2g-ws-capture.log.
+    try {
+      const dbg = w2gView.webContents.debugger;
+      if (!dbg.isAttached()) dbg.attach('1.3');
+      dbg.sendCommand('Network.enable').then(() => _w2gRecon('Network.enable OK')).catch((e) => _w2gRecon('Network.enable ERR ' + (e && e.message)));
+      dbg.on('message', (_e, method, params) => {
+        try {
+          if (method === 'Network.webSocketCreated') _w2gRecon('OPEN ' + (params.url || ''));
+          else if (method === 'Network.webSocketFrameSent') _w2gRecon('SEND ' + String((params.response && params.response.payloadData) || '').slice(0, 2000));
+          else if (method === 'Network.webSocketFrameReceived') _w2gRecon('RECV ' + String((params.response && params.response.payloadData) || '').slice(0, 2000));
+        } catch {}
+      });
+      _w2gRecon('--- recon debugger attached OK ---');
+    } catch (e) { _w2gRecon('--- recon attach FAILED: ' + (e && e.message) + ' ---'); }
   }
   w2gView.__mode = (mode === 'full') ? 'full' : 'just-video';
   w2gView.webContents.loadURL(url);
@@ -684,12 +711,104 @@ ipcMain.handle('ytdlp:get-recommendations', async (_e, videoId, limit) => {
   }
 });
 
+ipcMain.handle('ffmpeg:status', () => ({
+  installed: ffmpeg.isInstalled(),
+  path: ffmpeg.binPath(),
+}));
+
+ipcMain.handle('ffmpeg:install', async (event) => {
+  try {
+    await ffmpeg.ensure(({ received, total }) => {
+      try { event.sender.send('ffmpeg:install-progress', { received, total }); } catch {}
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
 ipcMain.handle('ytdlp:download', async (event, videoId, opts) => {
   try {
-    const result = await ytdlp.downloadVideo(videoId, opts || {}, (p) => {
+    // Make sure ffmpeg is available so yt-dlp can merge separate HD video +
+    // audio streams (otherwise it's capped at ~360p muxed). Fetched once,
+    // on demand. If it can't be obtained we degrade gracefully to the muxed
+    // best download rather than failing.
+    let ffmpegLocation = ffmpeg.isInstalled() ? ffmpeg.dir() : null;
+    if (!ffmpegLocation) {
+      try {
+        ffmpegLocation = await ffmpeg.ensure(({ received, total }) => {
+          try {
+            event.sender.send('ytdlp:download-progress', {
+              percent: total ? Math.round(received / total * 100) : 0,
+              totalBytes: 'Preparing HD — fetching ffmpeg',
+              speed: '', eta: '',
+            });
+          } catch {}
+        });
+      } catch (e) {
+        console.warn('ffmpeg unavailable, downloading muxed best:', e.message);
+      }
+    }
+    const result = await ytdlp.downloadVideo(videoId, { ...(opts || {}), ffmpegLocation }, (p) => {
       try { event.sender.send('ytdlp:download-progress', p); } catch {}
     });
     return { ok: true, ...result };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
+// Fetch a remote image's raw bytes in the main process. The renderer needs the
+// channel avatar to build a folder icon, but drawing a cross-origin <img> onto
+// a canvas taints it (export blocked). Fetching here (no CORS in Node) and
+// handing back the bytes lets the renderer build from a same-origin Blob.
+function fetchImageBuffer(url, depth = 0) {
+  return new Promise((resolve, reject) => {
+    if (depth > 5) return reject(new Error('Too many redirects'));
+    const https = require('https');
+    https.get(url, { headers: { 'User-Agent': 'youtube-glass/0.1' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return fetchImageBuffer(new URL(res.headers.location, url).toString(), depth + 1).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+ipcMain.handle('net:fetch-image', async (_e, url) => {
+  try {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error('bad url');
+    const buf = await fetchImageBuffer(url);
+    return { ok: true, base64: buf.toString('base64') };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+});
+
+// Apply a custom folder icon on Windows: drop the .ico + a desktop.ini that
+// points at it, then flag the files/folder so Explorer reads it. Best-effort —
+// callers treat failure as non-fatal (the download itself already succeeded).
+ipcMain.handle('download:set-folder-icon', async (_e, { folder, icoBase64 } = {}) => {
+  try {
+    if (!folder || !icoBase64) throw new Error('missing folder/icon');
+    if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error('folder not found');
+    const { execFile } = require('child_process');
+    const icoPath = path.join(folder, 'folder.ico');
+    const iniPath = path.join(folder, 'desktop.ini');
+    fs.writeFileSync(icoPath, Buffer.from(icoBase64, 'base64'));
+    fs.writeFileSync(iniPath, '[.ShellClassInfo]\r\nIconResource=folder.ico,0\r\nConfirmFileOp=0\r\n');
+    const attrib = (args) => new Promise(r => execFile('attrib', args, { windowsHide: true }, () => r()));
+    // Hide the helper files; mark desktop.ini system+hidden and the folder
+    // read-only so Explorer honours the custom icon.
+    await attrib(['+h', icoPath]);
+    await attrib(['+s', '+h', iniPath]);
+    await attrib(['+r', folder]);
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }

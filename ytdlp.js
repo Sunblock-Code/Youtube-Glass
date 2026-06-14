@@ -95,7 +95,10 @@ function getVideo(videoId) {
         '--extractor-retries', '3',
         // No --extractor-args override — let yt-dlp pick the player_client
         // combo that currently works against YouTube. The combo it ships with
-        // tracks YouTube's changes far better than a hardcoded list.
+        // tracks YouTube's changes far better than a hardcoded list. (Verified:
+        // forcing web_safari/ios/tv to try to get an adaptive HLS manifest just
+        // fails with "Requested format is not available" — those clients are
+        // bot-blocked / need PO tokens. The default gives progressive URLs.)
         url,
       ],
       { maxBuffer: 64 * 1024 * 1024, timeout: 60_000, windowsHide: true },
@@ -241,10 +244,23 @@ function downloadVideo(videoId, opts, onProgress) {
     const destDir = (opts && opts.destDir) || defaultDir;
     try { fs.mkdirSync(destDir, { recursive: true }); } catch { /* ignore */ }
     const includeChannel = !!(opts && opts.includeChannel);
-    const template = includeChannel
-      ? path.join(destDir, '[%(uploader)s] %(title)s.%(ext)s')
-      : path.join(destDir, '%(title)s.%(ext)s');
+    const channelSubfolder = !!(opts && opts.channelSubfolder);
+    // Per-channel subfolder takes precedence: the folder already conveys the
+    // channel, so the filename stays clean (no redundant "[Channel]" prefix).
+    // yt-dlp creates the %(uploader)s directory on demand.
+    const template = channelSubfolder
+      ? path.join(destDir, '%(uploader)s', '%(title)s.%(ext)s')
+      : includeChannel
+        ? path.join(destDir, '[%(uploader)s] %(title)s.%(ext)s')
+        : path.join(destDir, '%(title)s.%(ext)s');
 
+    // With ffmpeg available we can fetch separate video + audio streams and
+    // merge them — YouTube's single-file (muxed) formats top out around 360p,
+    // so this is the difference between a 360p download and a real 1080p one.
+    // Prefer AVC (H.264) video + AAC audio so the merge is a clean container
+    // copy (no slow re-encode) and the result plays in everything. Without
+    // ffmpeg, fall back to the best single muxed file (the old behaviour).
+    const ffmpegLocation = opts && opts.ffmpegLocation;
     const args = [
       '-o', template,
       '--no-playlist',
@@ -252,9 +268,17 @@ function downloadVideo(videoId, opts, onProgress) {
       '--no-call-home',
       '--newline',
       '--progress',
-      '-f', 'best[ext=mp4]/best',  // single muxed file; no ffmpeg required
-      url,
     ];
+    if (ffmpegLocation) {
+      args.push(
+        '-f', 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+        '--merge-output-format', 'mp4',
+        '--ffmpeg-location', ffmpegLocation,
+      );
+    } else {
+      args.push('-f', 'best[ext=mp4]/best'); // single muxed file; no ffmpeg required
+    }
+    args.push(url);
 
     let lastFile = '';
     let stderrBuf = '';
@@ -268,6 +292,10 @@ function downloadVideo(videoId, opts, onProgress) {
       for (const line of lines) {
         const dest = line.match(/^\[download\] Destination:\s*(.+)$/);
         if (dest) lastFile = dest[1];
+        // When video+audio are merged, the final file is named on the Merger
+        // line, not the per-stream Destination lines (which are temp fragments).
+        const merge = line.match(/Merging formats into "(.+)"/);
+        if (merge) lastFile = merge[1];
         const m = line.match(/\[download\]\s+(\d+\.?\d*)%(?:\s+of\s+~?\s*([\d\.]+\w+))?(?:\s+at\s+([\d\.]+\w+\/s))?(?:\s+ETA\s+([\d:]+))?/);
         if (m && onProgress) {
           onProgress({

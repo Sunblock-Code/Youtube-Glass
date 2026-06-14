@@ -4,5 +4,10 @@ package-lock.json
 dist/
 out/
 
+# Runtime-downloaded binaries (fetched on first use; never committed)
+yt-dlp.exe
+ffmpeg.exe
+ffprobe.exe
+
 # Personal Claude notes (workflow preferences, not for the repo)
 CLAUDE.local.md

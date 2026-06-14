@@ -166,7 +166,9 @@ contextBridge.exposeInMainWorld('app', {
   download: {
     defaultDir: () => ipcRenderer.invoke('download:default-dir'),
     pickDir:    (current) => ipcRenderer.invoke('download:pick-dir', current),
+    setFolderIcon: (folder, icoBase64) => ipcRenderer.invoke('download:set-folder-icon', { folder, icoBase64 }),
   },
+  fetchImage: (url) => ipcRenderer.invoke('net:fetch-image', url),
   configurePullout: (cfg) => ipcRenderer.invoke('pullout:configure', cfg),
   ytdlp: {
     status: () => ipcRenderer.invoke('ytdlp:status'),
@@ -185,6 +187,15 @@ contextBridge.exposeInMainWorld('app', {
       const handler = (_e, p) => cb(p);
       ipcRenderer.on('ytdlp:download-progress', handler);
       return () => ipcRenderer.removeListener('ytdlp:download-progress', handler);
+    },
+  },
+  ffmpeg: {
+    status: () => ipcRenderer.invoke('ffmpeg:status'),
+    install: () => ipcRenderer.invoke('ffmpeg:install'),
+    onInstallProgress: (cb) => {
+      const handler = (_e, p) => cb(p);
+      ipcRenderer.on('ffmpeg:install-progress', handler);
+      return () => ipcRenderer.removeListener('ffmpeg:install-progress', handler);
     },
   },
   showInFolder: (p) => ipcRenderer.invoke('shell:show-in-folder', p),

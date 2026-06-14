@@ -60,9 +60,6 @@ body {
 :root[data-scrollbars="hidden"] *::-webkit-scrollbar { display: none; width: 0; height: 0; }
 :root[data-scrollbars="hidden"] * { scrollbar-width: none; -ms-overflow-style: none; }
 
-/* Hide Proton Pass button when toggled off in Settings */
-:root[data-passbtn="hidden"] #pass-btn { display: none !important; }
-
 /* Hide donate button when toggled off in Settings (requires typing the
    phrase). The hate-text confirmation lives in the Theme tab. */
 :root[data-donate="hidden"] #donate-btn { display: none !important; }
@@ -455,6 +452,22 @@ body {
    into the 1fr (stretch) slot, ballooning it and shoving the search box +
    nav out of place ("buttons all fucked up"). */
 .titlebar { grid-template-columns: auto auto auto 1fr auto auto; }
+/* Settings → Buttons makes the whole top bar reorderable: switch the titlebar
+   from a fixed grid to a flex row, flatten .topnav (display:contents) so its
+   buttons become first-class flex items, and let CSS `order` (set per element
+   by applyTopbar) sequence everything. The search fills the slack; the window
+   controls stay pinned hard-right and are excluded from the manager. */
+.titlebar { display: flex; gap: 8px; }
+.titlebar > .search-wrap { flex: 1 1 auto; min-width: 90px; }
+/* Use `.titlebar > .topnav` (specificity 0,2,0) so this beats the later
+   `.topnav { display: flex }` rule (0,1,0) — otherwise the nav stays a flex
+   container, its buttons can't interleave with the rest of the bar via
+   `order`, and drag-reordering only shuffles them inside the nav group. */
+.titlebar > .topnav { display: contents; }
+.titlebar > .topnav > button { -webkit-app-region: no-drag; } /* .topnav has no box now, re-assert */
+.window-controls { order: 1000; margin-left: auto; }
+#settings-btn { order: 990; } /* Settings is excluded from the manager (can't be hidden) — pinned just left of the window controls */
+.btn-chip svg { width: 15px; height: 15px; flex-shrink: 0; }
 .brand { padding: 4px 8px; gap: 11px; }
 
 .back-btn {
@@ -661,6 +674,8 @@ body {
 /* --- Settings → Buttons: drag-and-drop button manager --- */
 .btn-mgr-zone {
   min-height: 46px;
+  max-height: 300px;   /* keep the list inside the modal — scroll within the box if taller */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -668,7 +683,7 @@ body {
   border-radius: 10px;
 }
 .btn-mgr-on  { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); } /* enabled box */
-.btn-mgr-off { border: 1px dashed var(--glass-border-strong); background: rgba(255, 255, 255, 0.02); }               /* disabled box (dotted) */
+.btn-mgr-off { border: 1px dashed var(--glass-border-strong); background: rgba(255, 255, 255, 0.02); max-height: 150px; } /* disabled box (dotted) */
 .btn-mgr-zone:empty::after {
   content: "Drag buttons here";
   color: var(--muted);
@@ -695,6 +710,77 @@ body {
 .btn-chip .topnav-icon { display: inline-block; width: 15px; height: 15px; flex-shrink: 0; }
 .btn-chip-grip { color: var(--muted); font-size: 13px; letter-spacing: -2px; cursor: grab; }
 .btn-chip-label { flex: 1; }
+
+/* Phrase challenge shown when dragging the Donate chip into the Disabled box
+   — overlays the settings card (same gate as the Theme tab's hide-donate). */
+.donate-phrase-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.donate-phrase-box {
+  width: 100%;
+  max-width: 460px;
+  box-sizing: border-box;
+  padding: 20px 22px;
+  border-radius: 14px;
+  /* Near-opaque surface (matches the modal-card tone) + its own blur so the
+     top-bar chips behind the overlay don't bleed through and make the prompt
+     unreadable. */
+  background: rgba(22, 24, 29, 0.97);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.donate-phrase-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.donate-phrase-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.donate-phrase-target {
+  font-family: monospace;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 10px 0;
+  user-select: all;
+  letter-spacing: 0.4px;
+  overflow-wrap: anywhere;
+}
+.donate-phrase-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+.donate-phrase-input:focus { border-color: var(--accent); background: var(--glass-strong); outline: none; }
+.donate-phrase-msg { font-size: 11px; color: #fca5a5; margin-top: 6px; min-height: 14px; }
+.donate-phrase-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.donate-phrase-cancel {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.donate-phrase-cancel:hover { background: var(--glass-strong); border-color: var(--glass-border-strong); }
 .topnav button.active {
   color: var(--text);
   background: var(--accent-soft);
@@ -2665,13 +2751,28 @@ input[type="checkbox"].glass-check:checked::after {
    min()-based height as indefinite and the body stops filling, which let the
    footer drift up under the previous flex-only layout). The body reserves
    bottom space so scrolling content never goes behind the pinned footer. */
-.modal-card.settings .settings-body { flex: 1 1 0; min-height: 0; padding-bottom: 64px; }
+.modal-card.settings .settings-body { flex: 1 1 0; min-height: 0; padding-bottom: 96px; }
+/* Reset / Done are stacked into a compact column tucked in the bottom-LEFT
+   corner (was a full-width 50/50 bar whose big buttons overlapped the last
+   chip). right:auto keeps it off the full width; the freed bottom-right is
+   open space. settings-body padding-bottom above clears the ~74px stack. */
 .modal-card.settings .modal-actions {
   position: absolute;
   left: 24px;
-  right: 24px;
+  right: auto;
   bottom: 18px;
   margin-top: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 150px;
+}
+.modal-card.settings .modal-actions button {
+  flex: 0 0 auto;
+  min-height: 0;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13.5px;
 }
 /* No darkening / blur backdrop when the settings modal is open — the user
    should see the app behind it cleanly. */

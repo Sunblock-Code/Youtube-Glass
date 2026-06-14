@@ -54,6 +54,8 @@
       "!build",
       "!scripts/build-icon.js",
       "!yt-dlp.exe",
+      "!ffmpeg.exe",
+      "!ffprobe.exe",
       "!glass-*.json",
       "!google-auth.json"
     ],

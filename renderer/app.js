@@ -214,13 +214,13 @@ const DEFAULT_SETTINGS = {
   askResume: true,
   showLikes: false,
   hideScrollbars: false,
-  hidePassButton: false,
   hideDonateButton: false,
   searchStyle: 'pill',   // 'pill' | 'square'
   hideSearchPlaceholder: false, // blank out the search box's "Search or paste…" placeholder
   hideSearchHint: false,        // hide the "Ctrl K" badge in the search box
   topnavStyle: 'text',   // 'text' | 'icon' | 'both' — Subs/Shorts/History buttons
   includeChannelInFilename: false,
+  downloadChannelSubfolder: false, // save each download under a per-channel subfolder + give it a channel-art folder icon
   downloadDir: '',                 // empty = use platform default (Downloads/YouTube)
   relatedWidth: 380,     // px — width of the Up next sidebar
   commentsPlacement: 'side',  // 'auto' | 'side' | 'below'  (default = always left)
@@ -318,18 +318,36 @@ async function rehydrateSettingsFromFile() {
   } catch {}
 }
 
-// Top-bar (topnav) button registry. The "Buttons" settings tab drag-reorders
-// these and toggles them on/off; order + state persist in settings.navButtons
-// as [{key, on}, …]. New buttons not yet in the saved list are appended (on).
-const NAV_BUTTONS = [
-  { key: 'subs',    label: 'Subs' },
-  { key: 'shorts',  label: 'Shorts' },
-  { key: 'history', label: 'History' },
-  { key: 'queue',   label: 'Queue' },
+// Every customizable top-bar element (Settings → Buttons): toggle on/off + drag
+// to reorder. Window controls (min / max / close) are intentionally excluded.
+// Order + state persist in settings.topbar as [{key, on}, …]; applyTopbar sets
+// each element's CSS `order` + visibility. The titlebar is a flex row and
+// .topnav is display:contents (styles.css), so all of these lay out as one row
+// and `order` can interleave them freely.
+const TOPBAR_ITEMS = [
+  { key: 'home',     label: 'Home / logo',       sel: '#home-btn' },
+  { key: 'back',     label: 'Back',              sel: '#back-btn' },
+  { key: 'fwd',      label: 'Forward',           sel: '#fwd-btn' },
+  { key: 'search',   label: 'Search bar',        sel: '.search-wrap' },
+  { key: 'subs',     label: 'Subs',              sel: 'button[data-route="subs"]' },
+  { key: 'shorts',   label: 'Shorts',            sel: 'button[data-route="shorts"]' },
+  { key: 'history',  label: 'History',           sel: 'button[data-route="history"]' },
+  { key: 'queue',    label: 'Queue',             sel: 'button[data-route="queue"]' },
+  { key: 'donate',   label: 'Donate',            sel: '#donate-btn' },
+  { key: 'account',  label: 'Sign in / account', sel: '#account-btn' },
+  { key: 'watch',    label: 'Watch together',    sel: '#wp-btn' },
+  { key: 'pass',     label: 'Proton Pass',       sel: '#pass-btn' },
+  // NOTE: Settings (#settings-btn) is deliberately NOT here — hiding the gear
+  // would lock the user out of settings. It's pinned via CSS (order: 990).
 ];
-function resolveNavButtons(s) {
-  const stored = Array.isArray(s && s.navButtons) ? s.navButtons : [];
-  const byKey = new Map(NAV_BUTTONS.map(b => [b.key, b]));
+function topbarElement(keyOrItem) {
+  const key = (keyOrItem && keyOrItem.key) ? keyOrItem.key : keyOrItem;
+  const def = TOPBAR_ITEMS.find(d => d.key === key);
+  return def ? document.querySelector('.titlebar ' + def.sel) : null;
+}
+function resolveTopbar(s) {
+  const stored = Array.isArray(s && s.topbar) ? s.topbar : [];
+  const byKey = new Map(TOPBAR_ITEMS.map(b => [b.key, b]));
   const out = [], seen = new Set();
   for (const it of stored) {
     if (it && byKey.has(it.key) && !seen.has(it.key)) {
@@ -337,20 +355,17 @@ function resolveNavButtons(s) {
       seen.add(it.key);
     }
   }
-  for (const b of NAV_BUTTONS) if (!seen.has(b.key)) out.push({ ...b, on: true });
+  for (const b of TOPBAR_ITEMS) if (!seen.has(b.key)) out.push({ ...b, on: true });
   return out;
 }
-// Reorder + show/hide the real topnav buttons to match the saved config.
-function applyNavButtons(s) {
-  const topnav = document.querySelector('.topnav');
-  if (!topnav) return;
-  const donate = document.getElementById('donate-btn'); // keep donate last
-  for (const b of resolveNavButtons(s)) {
-    const btn = topnav.querySelector(`button[data-route="${b.key}"]`);
-    if (!btn) continue;
-    btn.style.display = b.on ? '' : 'none';
-    if (donate) topnav.insertBefore(btn, donate); else topnav.appendChild(btn);
-  }
+// Apply order (CSS order) + visibility to each top-bar element.
+function applyTopbar(s) {
+  resolveTopbar(s).forEach((it, i) => {
+    const el = topbarElement(it);
+    if (!el) return;
+    el.style.order = String(i * 10);
+    el.style.display = it.on ? '' : 'none';
+  });
 }
 
 function applySettings(s) {
@@ -421,7 +436,6 @@ function applySettings(s) {
   // data-native-round so the CSS-radius fallback below stands down.
   window.app?.setRounded?.(!!s.roundedCorners);
   root.dataset.scrollbars = s.hideScrollbars ? 'hidden' : 'visible';
-  root.dataset.passbtn = s.hidePassButton ? 'hidden' : 'visible';
   root.dataset.donate = s.hideDonateButton ? 'hidden' : 'visible';
   root.dataset.search = s.searchStyle === 'square' ? 'square' : 'pill';
   // Optional: blank the search placeholder text / hide the Ctrl-K badge.
@@ -432,7 +446,7 @@ function applySettings(s) {
     _searchEl.placeholder = s.hideSearchPlaceholder ? '' : _searchEl.dataset.ph;
   }
   root.dataset.topnav = ['text', 'icon', 'both'].includes(s.topnavStyle) ? s.topnavStyle : 'text';
-  applyNavButtons(s); // order + on/off of the topnav buttons (Settings → Buttons)
+  applyTopbar(s); // order + on/off of every top-bar element (Settings → Buttons)
   root.dataset.heatmap = s.showHeatmap === false ? 'off' : 'on';
   root.dataset.subsBelow = s.subtitlesBelow ? '1' : ''; // captions: box below video vs on-video overlay
   root.style.setProperty('--related-width', (s.relatedWidth || 380) + 'px');
@@ -1914,15 +1928,46 @@ function buildHeatmapSVG(heatmap) {
   </svg>`;
 }
 
+// Short-lived in-memory cache of resolved stream/metadata. Re-opening a video
+// (replay, Back/Forward, clicking a related card you just came from) otherwise
+// re-spawns yt-dlp or re-hits Piped — seconds of dead time for data we already
+// have. googlevideo URLs stay valid for hours, so a 25-min TTL is comfortably
+// inside their lifetime. LRU-evicted at 40 entries; cleared on app restart.
+const _videoDataCache = new Map(); // id -> { at, data, source }
+const VIDEO_DATA_TTL = 25 * 60 * 1000;
+const VIDEO_DATA_MAX = 40;
+
 async function fetchVideoData(id) {
+  const hit = _videoDataCache.get(id);
+  if (hit && Date.now() - hit.at < VIDEO_DATA_TTL) {
+    _videoDataCache.delete(id);          // re-insert to mark most-recently-used
+    _videoDataCache.set(id, hit);
+    return { data: hit.data, source: hit.source };
+  }
+
+  let result = null;
   // Prefer yt-dlp when available (sidesteps YouTube's bot-block on Piped instances).
   if (ytdlpReady) {
     const r = await window.app.ytdlp.getVideo(id);
-    if (r.ok) return { data: normalizeYtDlp(r.data), source: 'ytdlp' };
-    console.warn('yt-dlp failed, falling back to Piped:', r.error);
+    if (r.ok) result = { data: normalizeYtDlp(r.data), source: 'ytdlp' };
+    else console.warn('yt-dlp failed, falling back to Piped:', r.error);
   }
-  const data = await api.streams(id);
-  return { data, source: 'piped' };
+  if (!result) {
+    const data = await api.streams(id);
+    result = { data, source: 'piped' };
+  }
+
+  // Only cache results that actually carry a playable stream — never pin a
+  // broken/empty extraction so a transient failure can't haunt re-opens.
+  const d = result.data;
+  const playable = d && (d.hls || d.dash || (d.videoStreams && d.videoStreams.length));
+  if (playable) {
+    _videoDataCache.set(id, { at: Date.now(), data: d, source: result.source });
+    if (_videoDataCache.size > VIDEO_DATA_MAX) {
+      _videoDataCache.delete(_videoDataCache.keys().next().value); // drop oldest
+    }
+  }
+  return result;
 }
 
 async function renderHistory() {
@@ -3477,7 +3522,7 @@ async function renderVideo(id) {
 
   // Wire download button
   const dlBtn = view.querySelector('#dl-btn');
-  if (dlBtn) dlBtn.onclick = () => downloadCurrentVideo(id);
+  if (dlBtn) dlBtn.onclick = () => downloadCurrentVideo(id, data);
 
   // Fetch channel info: avatar for the channel-row + related backfill if ytdlp.
   if (channelId) {
@@ -4557,7 +4602,54 @@ function attachCustomControls(v, root, data = {}) {
   }
 }
 
-async function downloadCurrentVideo(id) {
+// Build a Windows .ico (single 256×256 PNG-compressed frame) from a remote
+// channel avatar, masked to a rounded square — the per-channel download folder
+// icon. Bytes come from the main process (cross-origin avatars would taint the
+// canvas and block export), so we draw from a same-origin Blob. Returns base64
+// of the .ico, or '' if it can't be built.
+async function makeRoundedChannelIco(url, size = 256) {
+  const r = await window.app.fetchImage(url);
+  if (!r || !r.ok || !r.base64) return '';
+  const raw = Uint8Array.from(atob(r.base64), c => c.charCodeAt(0));
+  const bmp = await createImageBitmap(new Blob([raw]));
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const rad = Math.round(size * 0.18);            // rounded-square corner radius
+  ctx.beginPath();
+  ctx.moveTo(rad, 0);
+  ctx.arcTo(size, 0, size, size, rad);
+  ctx.arcTo(size, size, 0, size, rad);
+  ctx.arcTo(0, size, 0, 0, rad);
+  ctx.arcTo(0, 0, size, 0, rad);
+  ctx.closePath();
+  ctx.clip();
+  // Cover-fit (center-crop) so non-square art still fills the square.
+  const scale = Math.max(size / bmp.width, size / bmp.height);
+  const dw = bmp.width * scale, dh = bmp.height * scale;
+  ctx.drawImage(bmp, (size - dw) / 2, (size - dh) / 2, dw, dh);
+  const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!pngBlob) return '';
+  const png = new Uint8Array(await pngBlob.arrayBuffer());
+  // Minimal ICO container around the PNG (Vista+ reads PNG-compressed icons).
+  const ico = new Uint8Array(22 + png.length);
+  const dv = new DataView(ico.buffer);
+  dv.setUint16(0, 0, true);            // reserved
+  dv.setUint16(2, 1, true);            // type: icon
+  dv.setUint16(4, 1, true);            // image count
+  ico[6] = size >= 256 ? 0 : size;     // width  (0 ⇒ 256)
+  ico[7] = size >= 256 ? 0 : size;     // height (0 ⇒ 256)
+  dv.setUint16(10, 1, true);           // colour planes
+  dv.setUint16(12, 32, true);          // bits per pixel
+  dv.setUint32(14, png.length, true);  // image byte size
+  dv.setUint32(18, 22, true);          // image offset
+  ico.set(png, 22);
+  let bin = '';
+  for (let i = 0; i < ico.length; i++) bin += String.fromCharCode(ico[i]);
+  return btoa(bin);
+}
+
+async function downloadCurrentVideo(id, data) {
   if (!ytdlpReady) {
     showBanner(`
       <div class="banner-text">
@@ -4588,16 +4680,33 @@ async function downloadCurrentVideo(id) {
     if (info) info.textContent = `${totalBytes || ''}${speed ? ' · ' + speed : ''}${eta ? ' · ETA ' + eta : ''}`.trim() || '…';
   });
 
+  const perChannel = !!currentSettings.downloadChannelSubfolder;
   let result;
   try {
     result = await window.app.ytdlp.download(id, {
       includeChannel: !!currentSettings.includeChannelInFilename,
+      channelSubfolder: perChannel,
       destDir: currentSettings.downloadDir || undefined,
     });
   } catch (e) {
     result = { ok: false, error: e.message || String(e) };
   }
   off();
+
+  // Per-channel folder gets a rounded-square icon built from the channel
+  // avatar. Best-effort: the download already succeeded, so any failure here
+  // (no avatar, tainted image, non-Windows) is swallowed silently.
+  if (result.ok && perChannel && result.filename) {
+    try {
+      const folder = result.filename.replace(/[\\/][^\\/]+$/, '');
+      const avatarUrl = document.getElementById('channel-avatar')?.src
+        || (data && data.uploaderAvatar) || '';
+      if (folder && avatarUrl && /^https?:/i.test(avatarUrl)) {
+        const icoBase64 = await makeRoundedChannelIco(avatarUrl);
+        if (icoBase64) await window.app.download.setFolderIcon(folder, icoBase64);
+      }
+    } catch (e) { console.info('[folder-icon] skipped:', e.message); }
+  }
 
   if (result.ok) {
     const fname = result.filename ? result.filename.replace(/^.*[\\/]/, '') : '';
@@ -5453,12 +5562,12 @@ function showSettings() {
               Hide scrollbars
             </label>
             <label class="check-row">
-              <input type="checkbox" id="s-hidepass" ${s.hidePassButton ? 'checked' : ''} class="glass-check" />
-              Hide Proton Pass button
-            </label>
-            <label class="check-row">
               <input type="checkbox" id="s-channelfn" ${s.includeChannelInFilename ? 'checked' : ''} class="glass-check" />
               Include channel name in download filenames
+            </label>
+            <label class="check-row">
+              <input type="checkbox" id="s-channelsub" ${s.downloadChannelSubfolder ? 'checked' : ''} class="glass-check" />
+              Save downloads in a per-channel subfolder (with channel-art folder icon)
             </label>
 
             <div class="settings-label" style="margin-top:14px">Download folder</div>
@@ -5758,11 +5867,11 @@ function showSettings() {
   modalBody.querySelector('#s-hidebars').onchange = (e) => {
     update({ hideScrollbars: e.target.checked });
   };
-  modalBody.querySelector('#s-hidepass').onchange = (e) => {
-    update({ hidePassButton: e.target.checked });
-  };
   modalBody.querySelector('#s-channelfn').onchange = (e) => {
     update({ includeChannelInFilename: e.target.checked });
+  };
+  modalBody.querySelector('#s-channelsub').onchange = (e) => {
+    update({ downloadChannelSubfolder: e.target.checked });
   };
   modalBody.querySelector('#s-hide-searchph').onchange = (e) => {
     update({ hideSearchPlaceholder: e.target.checked });
@@ -5782,20 +5891,99 @@ function showSettings() {
       const out = [];
       onZone.querySelectorAll('.btn-chip').forEach(c => out.push({ key: c.dataset.key, on: true }));
       offZone.querySelectorAll('.btn-chip').forEach(c => out.push({ key: c.dataset.key, on: false }));
-      update({ navButtons: out });
+      update({ topbar: out });
+    };
+    // Donate is special: disabling it here (dragging the chip into the Disabled
+    // box) is gated by the SAME anti-donate phrase as the Theme tab's "Hide
+    // donate button" flow — otherwise the Buttons manager would be a silent
+    // bypass for that guard. The donate chip stays put until the phrase is
+    // typed; bailing snaps it back to exactly where it came from in Enabled.
+    const challengeDonate = (onPass, onFail) => {
+      const card = onZone.closest('.modal-card') || document.body;
+      const ov = document.createElement('div');
+      ov.className = 'donate-phrase-overlay';
+      ov.innerHTML = `
+        <div class="donate-phrase-box" role="dialog" aria-modal="true">
+          <div class="donate-phrase-title">Hide the donate button?</div>
+          <div class="donate-phrase-sub">To disable it, type the following phrase exactly:</div>
+          <div class="donate-phrase-target">${DONATE_PHRASE}</div>
+          <input type="text" class="donate-phrase-input" autocomplete="off" spellcheck="false" placeholder="Type the phrase…" />
+          <div class="donate-phrase-msg"></div>
+          <div class="donate-phrase-actions">
+            <button type="button" class="donate-phrase-cancel">Keep it</button>
+          </div>
+        </div>`;
+      card.appendChild(ov);
+      const input = ov.querySelector('.donate-phrase-input');
+      const msg = ov.querySelector('.donate-phrase-msg');
+      let done = false;
+      const finish = (pass) => {
+        if (done) return; done = true;
+        ov.remove();
+        (pass ? onPass : onFail)();
+      };
+      const check = () => {
+        const v = input.value.trim();
+        if (v === DONATE_PHRASE) finish(true);
+        else if (v.length >= DONATE_PHRASE.length) msg.textContent = "That isn't the phrase. Type it exactly as shown.";
+        else msg.textContent = '';
+      };
+      input.addEventListener('input', check);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); check(); }
+        else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      });
+      ov.querySelector('.donate-phrase-cancel').onclick = () => finish(false);
+      ov.addEventListener('mousedown', (e) => { if (e.target === ov) finish(false); });
+      setTimeout(() => input.focus(), 0);
+    };
+    // Runs on every drag drop. Commits the new order, except when the donate
+    // chip was just moved from Enabled → Disabled: that goes through the phrase.
+    const commitDrag = (chip) => {
+      if (chip.dataset.key === 'donate' && chip.parentElement === offZone && chip._fromZone === onZone) {
+        challengeDonate(
+          () => serialize(),
+          () => { (chip._fromZone || onZone).insertBefore(chip, chip._fromNext); serialize(); }
+        );
+        return;
+      }
+      serialize();
     };
     const makeChip = (b) => {
       const chip = document.createElement('div');
       chip.className = 'btn-chip';
       chip.draggable = true;
       chip.dataset.key = b.key;
-      const ic = document.querySelector(`.topnav button[data-route="${b.key}"] .topnav-icon`);
-      chip.innerHTML = `<span class="btn-chip-grip" aria-hidden="true">⠿</span>${ic ? ic.outerHTML : ''}<span class="btn-chip-label">${escape(b.label)}</span>`;
-      chip.addEventListener('dragstart', () => chip.classList.add('dragging'));
-      chip.addEventListener('dragend', () => { chip.classList.remove('dragging'); serialize(); });
+      const grip = document.createElement('span');
+      grip.className = 'btn-chip-grip';
+      grip.setAttribute('aria-hidden', 'true');
+      grip.textContent = '⠿';
+      chip.appendChild(grip);
+      const el = topbarElement(b);
+      const svg = el && el.querySelector('svg');
+      if (svg) {
+        // Clone the element's own icon, but strip its class/style — e.g. the
+        // search icon is position:absolute via .search-icon, which would fling
+        // it out of the chip. Declassed, it just flows inline (sized by CSS).
+        const ico = svg.cloneNode(true);
+        ico.removeAttribute('class');
+        ico.removeAttribute('style');
+        chip.appendChild(ico);
+      }
+      const lbl = document.createElement('span');
+      lbl.className = 'btn-chip-label';
+      lbl.textContent = b.label;
+      chip.appendChild(lbl);
+      chip.addEventListener('dragstart', () => {
+        // Remember where the chip started so a bailed donate-hide can snap back.
+        chip._fromZone = chip.parentElement;
+        chip._fromNext = chip.nextElementSibling;
+        chip.classList.add('dragging');
+      });
+      chip.addEventListener('dragend', () => { chip.classList.remove('dragging'); commitDrag(chip); });
       return chip;
     };
-    for (const b of resolveNavButtons(currentSettings)) {
+    for (const b of resolveTopbar(currentSettings)) {
       (b.on ? onZone : offZone).appendChild(makeChip(b));
     }
     // Find the chip the cursor is above (for vertical reorder/insertion).
