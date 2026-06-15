@@ -2635,6 +2635,7 @@ async function renderVideo(id) {
         </div>
       </div>
       <div class="related-col">
+        <div class="related-sticky">
         <div class="related-stickyhead">
         <div class="related-tabs" role="tablist" aria-label="Sidebar source">
           <button class="related-tab ${relatedSource === 'related' ? 'active' : ''}" data-rt="related" role="tab">Up next</button>
@@ -2658,6 +2659,7 @@ async function renderVideo(id) {
           ${relatedSource === 'related'
             ? (data.relatedStreams || []).slice(0, 16).map(relatedRow).join('')
             : '<div class="loader" style="padding:30px">Loading</div>'}
+        </div>
         </div>
       </div>
     </div>

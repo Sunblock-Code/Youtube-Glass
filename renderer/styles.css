@@ -374,10 +374,27 @@ body {
   background: rgba(10, 6, 18, 0.85);
   backdrop-filter: blur(40px) saturate(160%);
   -webkit-backdrop-filter: blur(40px) saturate(160%);
-  border-bottom: 1px solid var(--glass-border);
+  /* No hard 1px border — the soft blur-fade below (::after) replaces it so the
+     frosted bar melts into the content instead of ending on a crisp line. */
   box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.55);
   position: relative;
   z-index: 10;
+}
+/* Soft transition under the titlebar: a thin strip just below it with a
+   tint that fades to transparent over ~20px, so the frosted bar blends into
+   the content instead of ending on a hard line. NB: deliberately a plain
+   gradient — NOT a backdrop-filter. This strip overlaps the TOP of the
+   scrolling side panels, and a backdrop-blur here makes Chromium re-rasterize
+   the moving content every frame, smearing the "Up next" cards as they scroll
+   (the same trap the data-bgmode rule above guards against). */
+.titlebar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 100%;
+  height: 20px;
+  z-index: 9;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(10, 6, 18, 0.55), rgba(10, 6, 18, 0));
 }
 .titlebar > * { -webkit-app-region: no-drag; }
 
@@ -1428,7 +1445,22 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
     height: auto;
     max-height: none;
   }
-  .player-page > .related-col .related { overflow-y: visible; }
+  /* List scrolls inside the pinned rail (was visible → it grew and the whole
+     panel scrolled with the page). */
+  .player-page > .related-col .related { overflow-y: auto; min-height: 0; }
+  /* Any mode here stacks comments below the player and page-scrolls (auto) or
+     keeps a side rail (side) — either way pin the Up next COLUMN as a fixed
+     right rail so it's always flush and never slides at the scroll bottom.
+     Unprefixed so it covers side AND auto (whichever the user is in). */
+  .player-page:not([data-cmode-below]):not(.related-collapsed):not(.merged-collapsed) > .related-col {
+    position: fixed;
+    top: 80px;
+    bottom: 16px;
+    right: 40px;
+    width: var(--related-width, 380px);
+    height: auto;
+    z-index: 5;
+  }
   /* Make sure the comments column also goes static + full-width when both
      side panels collapse into the single column. */
   .player-page > .comments-col {
@@ -1581,7 +1613,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      element it ghosts as content scrolls behind. In acrylic the ~10% that
      still shows through is the OS-frosted desktop, so it reads as frosted
      glass without any of that smear. */
-  background: rgba(18, 20, 24, 0.9); /* neutral grey (was purple rgba(11,7,17)) */
+  background: rgba(40, 44, 52, 0.96); /* lighter grey, ~matches the comments backdrop; opaque so the page-scroll layout doesn't bleed through */
   border-bottom: 1px solid var(--glass-border);
   /* Align the panel to the comment rows below it (the list's 4px row inset)
      instead of the old wider overhang, so the "box that says COMMENTS"
@@ -1638,7 +1670,10 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   /* Flush within the panel — the panel now sits at the comment-row edges, so
      a zero side margin lands the composer on exactly the comment-row width. */
   margin: 0 0 10px;
-  background: var(--glass);
+  /* Transparent so it shows the same grey as the comments backdrop around it
+     (was var(--glass), a lighter white tint that stood out as a brighter box).
+     The subtle border keeps it identifiable as the input. */
+  background: transparent;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   transition: border-color 0.15s, background 0.15s;
@@ -1915,6 +1950,35 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
    layout so the existing centering rules on .related-header still apply. */
 .player-page.related-collapsed .related-stickyhead,
 .player-page.merged-collapsed .related-stickyhead { display: contents; }
+
+/* The wrapper holds the whole Up next panel (header + list). In the wide /
+   side layouts the COLUMN is sticky and the wrapper just fills it. */
+.related-sticky {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+/* In the page-scroll layout (comments BELOW the player), pin the Up next COLUMN
+   as a position:FIXED right rail — anchored top (titlebar 56 + pad 24 = 80px)
+   to bottom (16px), aligned to the reserved related column on the right. Unlike
+   sticky, fixed never releases at the bottom of the scroll, so it's ALWAYS
+   pinned and flush. The grid still reserves the column track, so the left
+   content keeps its width; the wrapper + list fill the fixed column. */
+.player-page[data-cmode-below]:not(.related-collapsed):not(.merged-collapsed) > .related-col {
+  position: fixed;
+  top: 80px;
+  bottom: 16px;
+  right: 40px;
+  width: var(--related-width, 380px);
+  height: auto;
+  z-index: 5;
+}
+/* Neutralise the wrapper in the collapsed-sliver / merged-panel modes, which
+   lay the header + list out directly (mirrors the .related-stickyhead rule). */
+.player-page.related-collapsed .related-sticky,
+.player-page.merged-collapsed .related-sticky,
+.player-page[data-merged] .related-sticky { display: contents; }
 
 .related-header {
   display: flex;
@@ -4739,7 +4803,16 @@ body.dragging-panel * { cursor: grabbing !important; }
 }
 /* In-text links — bright cool tone with a soft underline so they're easy
    to spot against the dim description text without screaming. */
-.video-desc .desc-link {
+/* Cover EVERY link in the description and comments:
+   - .desc-link        → the rich-mode / comment linkifier's anchors
+   - .video-desc a     → raw-mode plain <a> from sanitizeDescription() (these
+                         had no class, so they fell back to the browser default
+                         dark blue #0000EE — unreadable on the dark background)
+   - .comment ... a    → comment body links */
+.desc-link,
+.video-desc a,
+.comment-text a,
+.comment-body a {
   color: #7dd3fc;
   text-decoration: underline;
   text-decoration-color: rgba(125, 211, 252, 0.45);
@@ -4749,7 +4822,10 @@ body.dragging-panel * { cursor: grabbing !important; }
   transition: color 0.15s ease, text-decoration-color 0.15s ease,
               text-shadow 0.15s ease;
 }
-.video-desc .desc-link:hover {
+.desc-link:hover,
+.video-desc a:hover,
+.comment-text a:hover,
+.comment-body a:hover {
   color: #a5f3fc;
   text-decoration-color: #67e8f9;
   text-shadow: 0 0 10px rgba(103, 232, 249, 0.45);
@@ -6421,7 +6497,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   position: sticky;
   top: 0;
   z-index: 8;
-  background: rgba(18, 20, 24, 0.9); /* neutral grey bar (was purple rgba(11,7,17)) */
+  background: rgba(40, 44, 52, 0.96); /* lighter grey, matches .comments-stickyhead */
   padding: 0 0 8px;
   /* Match the .comments-stickyhead panel below it (now at the comment-row
      edges, margin: 0 4px) so the tab row and the panel share the same width. */
