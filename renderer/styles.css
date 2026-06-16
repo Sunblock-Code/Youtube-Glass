@@ -1623,7 +1623,12 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      element it ghosts as content scrolls behind. In acrylic the ~10% that
      still shows through is the OS-frosted desktop, so it reads as frosted
      glass without any of that smear. */
-  background: rgba(40, 44, 52, 0.96); /* lighter grey, ~matches the comments backdrop; opaque so the page-scroll layout doesn't bleed through */
+  /* Matches the .comments-tabs background above — opaque purple-tinted
+     surface that mimics how var(--glass) renders over the page bg.
+     Stays opaque (not actual var(--glass)) because the sticky element
+     can't use backdrop-filter without thrashing the compositor as
+     comments scroll behind it. */
+  background: rgb(28, 20, 44);
   border-bottom: 1px solid var(--glass-border);
   /* Align the panel to the comment rows below it (the list's 4px row inset)
      instead of the old wider overhang, so the "box that says COMMENTS"
@@ -6520,8 +6525,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   position: sticky;
   top: 0;
   z-index: 8;
-  background: rgba(40, 44, 52, 0.96); /* lighter grey, matches .comments-stickyhead */
-  padding: 0 0 8px;
+  /* Background tuned to look like the description box's glass-over-page
+     tint — slightly purple, lighter than the old neutral grey. Stays
+     opaque (no backdrop-filter on a sticky element) so comments scroll
+     cleanly behind it. */
+  background: rgb(28, 20, 44);
+  /* Vertical padding so the Comments / Chat pills sit centred in the
+     bar instead of flush with the top edge. */
+  padding: 8px 0;
   /* Match the .comments-stickyhead panel below it (now at the comment-row
      edges, margin: 0 4px) so the tab row and the panel share the same width. */
   margin: 0 4px;
