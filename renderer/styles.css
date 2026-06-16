@@ -1152,9 +1152,14 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 .player-page > .related-col,
 .player-page > .comments-col {
   position: sticky;
-  top: 0;
+  /* Pin 24px below the scrollport top (y:80 = titlebar 56 + main's 24px pad)
+     so the tab header clears the titlebar's 20px blur-fade (.titlebar::after).
+     At top:0 the panel pinned flush at y:56 and that fade fell over the top of
+     the Up next / Subs / History / Queue tab text — it read as the tabs sliding
+     under the title bar. Matches the fixed-rail layouts, which use top:80px. */
+  top: 24px;
   align-self: start;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 104px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1223,7 +1228,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease;
   padding: 0;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 104px);
   min-height: 110px;
 }
 
@@ -1532,8 +1537,8 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   grid-column: auto;
   grid-row: auto;
   position: sticky;
-  top: 0;
-  height: calc(100vh - 80px);
+  top: 24px;
+  height: calc(100vh - 104px);
   margin-top: 0;
   border-top: none;
   padding-top: 0;
@@ -1941,8 +1946,11 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
    transparent on the page) — an opaque panel here made the sidebar tabs look
    heavier than every other tab bar in the app. */
 .related-stickyhead {
-  position: sticky;
-  top: 0;
+  /* Static, not sticky: it's a flex item directly above the internally-
+     scrolling .related list, so it naturally stays at the top and the list
+     clips beneath it. (As position:sticky inside the position:fixed rail it
+     stuck to the PAGE scroller and let cards slip up past the header bar.) */
+  position: static;
   z-index: 7;
   background: transparent;
 }
@@ -3339,9 +3347,9 @@ input[type="checkbox"].glass-check:checked::after {
   grid-column: 2;
   grid-row: 1;
   position: sticky;
-  top: 0;
+  top: 24px;
   align-self: start;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 104px);
   margin: 0;
   border-top: none;
   padding-top: 0;
@@ -3360,9 +3368,9 @@ input[type="checkbox"].glass-check:checked::after {
   grid-column: 1;
   grid-row: 1;
   position: sticky;
-  top: 0;
+  top: 24px;
   align-self: start;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 104px);
   margin: 0;
   border-top: none;
   padding-top: 0;
