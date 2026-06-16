@@ -6048,6 +6048,16 @@ body.dragging-panel * { cursor: grabbing !important; }
   background: var(--accent-soft);
   border-color: rgba(var(--accent-rgb), 0.40);
 }
+/* Kill the browser's default white focus ring when toggling between the
+   Glass Sync / Watch2Gether tabs — it clashed with the dark modal. Mouse
+   clicks get no ring (the .active accent pill is feedback enough); keyboard
+   users still get a themed ring via :focus-visible. */
+.wp-tab:focus { outline: none; }
+.wp-tab:focus-visible {
+  outline: none;
+  border-color: rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 .wp-tab-pane { display: none; }
 .wp-tab-pane.active { display: block; }
 
