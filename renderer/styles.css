@@ -1159,12 +1159,7 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      under the title bar. Matches the fixed-rail layouts, which use top:80px. */
   top: 24px;
   align-self: start;
-  /* Was `100vh - 104px` — the panel ended 80 px above the viewport bottom,
-     leaving an empty strip of page background showing below it whenever
-     the user scrolled the list to the end. Tightened to `100vh - 48px`
-     so the panel reaches close to the visible viewport bottom and the
-     last card sits right at the edge instead of a void below it. */
-  height: calc(100vh - 48px);
+  height: calc(100vh - 104px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1181,14 +1176,13 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      while top / right / bottom render correctly — long-standing bug. */
   padding-left: 4px;
   padding-right: 4px;
+  /* Top breathing room so the first item never butts against the scroll
+     container's top edge — without this the first thumbnail can appear
+     cropped at the top whenever the chrome above (related-tabs +
+     related-header) reflows or the user lands at scroll top after a
+     partial scroll. Bottom padding so the last row isn't flush either. */
   padding-top: 4px;
-  /* 24 px bottom padding so the last card always has room to scroll into
-     view. Previously 0, which meant the column extending close to the
-     viewport bottom could clip the last card's lower half — the user
-     couldn't actually finish reading it no matter how hard they scrolled.
-     24 px gives just enough clearance without re-introducing the wide
-     empty strip we removed earlier. */
-  padding-bottom: 24px;
+  padding-bottom: 8px;
   /* Don't bubble wheel events to the page — keeps the side panels' positions
      and scroll state stable when the user scrolls the description / video. */
   overscroll-behavior: contain;
