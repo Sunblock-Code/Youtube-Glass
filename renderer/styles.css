@@ -1182,12 +1182,13 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   padding-left: 4px;
   padding-right: 4px;
   padding-top: 4px;
-  /* No padding-bottom — when the user scrolls to the end of the list the
-     last card now sits flush with the panel's bottom edge instead of
-     leaving an 8 px gap. Combined with the taller column above, the
-     bottom of the sidebar no longer reads as "empty space below the
-     content". */
-  padding-bottom: 0;
+  /* 24 px bottom padding so the last card always has room to scroll into
+     view. Previously 0, which meant the column extending close to the
+     viewport bottom could clip the last card's lower half — the user
+     couldn't actually finish reading it no matter how hard they scrolled.
+     24 px gives just enough clearance without re-introducing the wide
+     empty strip we removed earlier. */
+  padding-bottom: 24px;
   /* Don't bubble wheel events to the page — keeps the side panels' positions
      and scroll state stable when the user scrolls the description / video. */
   overscroll-behavior: contain;
