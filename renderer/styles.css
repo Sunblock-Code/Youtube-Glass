@@ -1550,6 +1550,26 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   border-top: none;
   padding-top: 0;
 }
+/* THE scroll-chaining fix. In side mode between 1001–1700px the
+   `@media (max-width: 1700px)` block above sets `.comments-list` to
+   `overflow-y: visible`, which kills the list's OWN scrollbar — the
+   comments then overflow the fixed-height column and the only way to
+   read them is to scroll the whole PAGE, which drags Up next and the
+   rest of the layout up with it (the long-standing "scrolls affect
+   each other" bug).
+   Restore the list's internal scroll (with overscroll containment) so
+   comments scroll inside their own box and never touch the page scroll.
+   Scoped to min-width:1001px so the ≤1000 narrow-dock layout — which
+   intentionally stacks everything into one page-scrolling column — is
+   left alone. Same selector specificity as the 1700 rule but later in
+   source, so it wins in the overlap. */
+@media (min-width: 1001px) {
+  :root[data-comments="side"] .player-page > .comments-col .comments-list {
+    overflow-y: auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+}
 :root[data-comments="side"] .player-page.comments-collapsed .comments-header {
   justify-content: center;
 }
