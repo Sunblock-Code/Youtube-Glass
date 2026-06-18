@@ -1180,9 +1180,16 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
      container's top edge — without this the first thumbnail can appear
      cropped at the top whenever the chrome above (related-tabs +
      related-header) reflows or the user lands at scroll top after a
-     partial scroll. Bottom padding so the last row isn't flush either. */
+     partial scroll. */
   padding-top: 4px;
-  padding-bottom: 8px;
+  /* 60 px bottom padding so the last card can be scrolled fully into
+     view past the panel's bottom edge. 8 px was enough that the last
+     card sat just at the edge but its lower half got clipped — the
+     user couldn't bring it into the visible area no matter how far
+     they scrolled. This change is purely on the scroll container's
+     internal padding; the column's outer height is untouched so it
+     can't bleed into the title bar. */
+  padding-bottom: 60px;
   /* Don't bubble wheel events to the page — keeps the side panels' positions
      and scroll state stable when the user scrolls the description / video. */
   overscroll-behavior: contain;
