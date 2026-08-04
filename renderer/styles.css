@@ -196,28 +196,36 @@ body {
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-border-strong: rgba(255, 255, 255, 0.16);
 }
-/* Both see-through modes: NO renderer background layer — the empty space is
-   genuinely empty so the desktop (Clear: sharp, via the transparent window)
-   or the Windows OS acrylic material (Acrylic: frosted, composited by the
-   OS into the #00000000 window) shows there. A CSS backdrop-filter frost is
-   impossible — backdrop-filter can't reach the OS desktop behind a window —
-   which is why the earlier CSS-frost attempt looked identical to Clear. */
-:root[data-bgmode="clear"] .bg::after,
-:root[data-bgmode="clear"] .blob,
-:root[data-bgmode="acrylic"] .bg::after,
-:root[data-bgmode="acrylic"] .blob { display: none; }
-/* Clear AND Acrylic: .bg is a flat dark VEIL over the (Clear: sharp /
-   Acrylic: OS-frosted) desktop, sitting BEHIND all UI (z-index 0). Its
-   opacity = the "Background dim" slider. 0 = invisible → the desktop shows
-   exactly as the mode renders it (this is the default, so it can't break
-   the working acrylic); higher = the desktop is progressively darkened.
-   Opaque cards sit on top, so the UI is never affected — only the empty/
-   background space dims. */
+/* Both see-through modes: .bg is Glass's OWN background — gradient, blobs and
+   noise, exactly as in Gradient mode — laid over the desktop at the "Background
+   dim" opacity, sitting BEHIND all UI (z-index 0). 0 = invisible, so the empty
+   space is the pure desktop (Clear: sharp; that's still the default and the
+   original behaviour); higher = progressively more Glass background over it.
+
+   It used to be a FLAT dark veil here, with the gradient/blobs/noise switched
+   off. That flatness is why the "Blur" slider read as a dead control: a
+   translucent card can only backdrop-filter what the PAGE painted below it —
+   never the OS desktop behind the window (and no native API frosts that either;
+   see the measured results in the "Why the see-through modes can't show a
+   BLURRED desktop" block in main.js). So the cards were dutifully blurring a
+   single flat colour, which looks identical to not blurring at all. Keeping the
+   real background means there's finally structure down there to frost, and the
+   frosted glass is genuine rather than a no-op. */
 :root[data-bgmode="clear"] .bg,
 :root[data-bgmode="acrylic"] .bg {
   display: block;
-  background: var(--bg-solid, #0a0612);
   opacity: var(--clear-bg-tint, 0);
+}
+/* …but freeze it while the Blur slider is up. An ANIMATED backdrop under a
+   backdrop-filtered surface forces Chromium to re-rasterize the card's whole
+   backdrop every frame — the "super glitchy" smearing the kill-list below was
+   written to avoid. Static gradient + blobs frost just as well and rasterize
+   once. Blur at 0 keeps the motion, since nothing is sampling it then. */
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .bg,
+:root[data-acrylic-blur="on"][data-bgmode="clear"] .blob,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .bg,
+:root[data-acrylic-blur="on"][data-bgmode="acrylic"] .blob {
+  animation: none;
 }
 /* The page itself gets the dark tint (NOT fully transparent). This is the
    systemic fix for the "glitchy text" — bare text that sits directly on the

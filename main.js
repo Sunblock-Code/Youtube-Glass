@@ -87,6 +87,33 @@ function applyWindowCorners() {
   } catch { return false; }
 }
 
+// --- Why the see-through modes can't show a BLURRED desktop ----------------
+// Measured on this machine (Win11 26200, transparency effects ON), each option
+// rendered over a high-contrast stripe pattern behind the window:
+//
+//   transparent:true + DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE=38,
+//     DWMSBT_TRANSIENTWINDOW=3)          -> returns S_OK, draws NOTHING. The
+//     system backdrop needs the window's redirection surface, which a
+//     transparent window doesn't have. Desktop stays razor sharp. Same for
+//     Electron's setBackgroundMaterial(), which is a wrapper over this — so
+//     the Acrylic/Mica/Gaussian presets have never actually frosted anything.
+//
+//   transparent:true + user32!SetWindowCompositionAttribute with an
+//     ACCENT_POLICY of ACCENT_ENABLE_ACRYLICBLURBEHIND (4) or
+//     ACCENT_ENABLE_BLURBEHIND (3)       -> returns TRUE and paints an OPAQUE
+//     dark wash. No blur, and see-through is destroyed. Win11 retired the
+//     accent-policy blur; it now falls back to a flat tint. Do not re-try this.
+//
+//   transparent:false + backgroundMaterial 'acrylic'/'mica'/'tabbed'
+//                                        -> draws the material's base tint but
+//     samples nothing behind it (flat dark grey), and gives up see-through
+//     entirely since the window is no longer transparent.
+//
+// So: on this OS a transparent window shows the real desktop SHARP, full stop.
+// CSS can't help either — backdrop-filter only samples what the page itself
+// painted, never the desktop behind the window. The only remaining route is
+// painting a desktopCapturer snapshot, blurred, as the app's own background.
+
 // Tell the renderer whether the OS is handling the corners, so it can drop its
 // CSS-radius fallback (which would otherwise double-round against the region clip).
 function sendNativeRoundingState() {

@@ -395,10 +395,12 @@ function applySettings(s) {
   // working rules are untouched.
   const cssBgMode = (s.bgMode === 'mica' || s.bgMode === 'gaussian') ? 'acrylic' : s.bgMode;
   root.dataset.bgmode = ['solid', 'acrylic', 'clear'].includes(cssBgMode) ? cssBgMode : 'gradient';
-  // Clear-glass "Background dim": opacity of the dark veil over the desktop
-  // in the empty space ONLY. 0 = no veil (pure sharp desktop), higher =
-  // desktop progressively darkened. The UI surfaces stay fully opaque and
-  // are NEVER touched by this. CSS reads --clear-bg-tint (bgMode=clear).
+  // "Background dim": opacity of Glass's OWN background (gradient + blobs +
+  // noise) laid over the desktop in the empty space ONLY. 0 = nothing (pure
+  // sharp desktop), higher = progressively more of it. The UI surfaces stay
+  // fully opaque and are NEVER touched by this. CSS reads --clear-bg-tint.
+  // NOTE: this is recomputed below with the per-preset baseline floor — that
+  // second write is the one that lands.
   {
     const st = (typeof s.clearSeeThrough === 'number') ? s.clearSeeThrough : 0;
     const veil = Math.min(0.85, Math.max(0, st / 100));
@@ -414,11 +416,13 @@ function applySettings(s) {
     // Card alpha is the INVERSE of see-through: 0% see-through = alpha 1.
     root.style.setProperty('--acrylic-card-alpha', (1 - seeThrough).toFixed(3));
   }
-  // See-through-modes "Blur": optional backdrop-filter blur on cards.
-  // The blanket `* { backdrop-filter: none !important }` rule in the
-  // acrylic/clear CSS keeps the smooth-composite default in place. We
-  // toggle a root attribute that activates the scoped, opted-in
-  // backdrop-filter rule only when the slider is above 0.
+  // See-through-modes "Blur": backdrop-filter blur on the translucent cards,
+  // frosting Glass's own background (the --clear-bg-tint layer) behind them —
+  // NOT the desktop, which nothing in Chromium or Win32 can blur behind a
+  // transparent window (see main.js). The scoped kill-list in the acrylic/clear
+  // CSS keeps the smooth-composite default in place; this root attribute
+  // activates the opted-in re-enable, and also freezes the background motion so
+  // the cards aren't re-rasterizing an animating backdrop every frame.
   {
     const blur = (typeof s.acrylicBlur === 'number') ? s.acrylicBlur : 0;
     const px = Math.min(40, Math.max(0, blur));
@@ -466,22 +470,23 @@ function applySettings(s) {
   // translucent glass cards — which read as "background opacity affecting
   // the UI". Only Acrylic uses the OS material now; everything else keeps
   // the window opaque (Gradient/Solid) or transparent (Clear, no material).
-  // Real OS material per mode: Acrylic→acrylic, Mica→mica, Gaussian→the
-  // Win11 'tabbed' material, Clear→none (sharp), everything else→none.
-  // Acrylic is the only Windows material that actually renders see-through
-  // on the transparent window this machine needs (Mica/Tabbed paint nothing
-  // here). So Mica & Gaussian RENDER via the acrylic material too — they're
-  // differentiated by their own default tint/veil (below), not by a separate
-  // OS material that wouldn't show up. Clear = no material (sharp). This is
-  // what makes Mica & Gaussian actually work.
+  // Kept for the non-transparent modes and as a no-op elsewhere. Measured
+  // truth: NO Windows material renders on the transparent window these modes
+  // need — acrylic, mica and tabbed alike are silently dropped, because DWM's
+  // system backdrop has no redirection surface to draw into (details in
+  // main.js). So Acrylic/Mica/Gaussian are not OS materials at all; they're
+  // three baseline levels of Glass's own background over the desktop, set by
+  // the veil floor just below. Don't reach for a different material here
+  // expecting a different look — none of them paint.
   const osMaterial =
     (s.bgMode === 'acrylic' || s.bgMode === 'mica' || s.bgMode === 'gaussian') ? 'acrylic' :
     'none';
   if (window.app?.setWindowMaterial) window.app.setWindowMaterial(osMaterial);
-  // Distinct DEFAULT look per see-through preset (all use the acrylic engine
-  // but feel different out of the box): Acrylic = clean frost, Mica = a
-  // subtle solid-ish tint, Gaussian = a medium frost. Applied as a baseline
-  // floor on the background-dim veil so the user's slider can still go higher.
+  // Distinct DEFAULT look per see-through preset — how much of Glass's own
+  // background sits over the desktop out of the box: Acrylic = none (pure
+  // desktop), Gaussian = 20%, Mica = 40%. Applied as a baseline floor on the
+  // background-dim veil so the user's slider can still go higher. This is also
+  // what the Blur slider frosts, so a preset with a higher floor frosts more.
   {
     const baseVeil = { mica: 0.40, gaussian: 0.20 }[s.bgMode] || 0;
     const slider = (typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0) / 100;
@@ -5526,9 +5531,9 @@ function showSettings() {
             <div class="theme-options">
               <button class="theme-pill ${s.bgMode === 'gradient' ? 'active' : ''}" data-bgmode="gradient">Gradient</button>
               <button class="theme-pill ${s.bgMode === 'solid' ? 'active' : ''}" data-bgmode="solid">Solid colour</button>
-              <button class="theme-pill ${s.bgMode === 'acrylic' ? 'active' : ''}" data-bgmode="acrylic" title="Windows OS acrylic — the real desktop shows FROSTED/blurred in the empty areas, UI stays solid.">Acrylic</button>
-              <button class="theme-pill ${s.bgMode === 'mica' ? 'active' : ''}" data-bgmode="mica" title="Windows OS Mica — subtle desktop-wallpaper tint in the empty areas, UI stays solid.">Mica</button>
-              <button class="theme-pill ${s.bgMode === 'gaussian' ? 'active' : ''}" data-bgmode="gaussian" title="Windows OS Tabbed material — another frosted desktop look in the empty areas, UI stays solid.">Gaussian</button>
+              <button class="theme-pill ${s.bgMode === 'acrylic' ? 'active' : ''}" data-bgmode="acrylic" title="Transparent window, no background of our own — the desktop shows in the empty areas. Raise Background dim to lay Glass's gradient over it, then Blur to frost that through the cards.">Acrylic</button>
+              <button class="theme-pill ${s.bgMode === 'mica' ? 'active' : ''}" data-bgmode="mica" title="Same as Acrylic but starts with Glass's background at 40% over the desktop — the most tinted of the three.">Mica</button>
+              <button class="theme-pill ${s.bgMode === 'gaussian' ? 'active' : ''}" data-bgmode="gaussian" title="Same as Acrylic but starts with Glass's background at 20% over the desktop — a middle ground between Acrylic and Mica.">Gaussian</button>
               <button class="theme-pill ${s.bgMode === 'clear' ? 'active' : ''}" data-bgmode="clear" title="Transparent window — the real desktop shows SHARP in the empty areas, UI stays solid. Restart to toggle.">Clear glass</button>
             </div>
             <div id="clear-restart-note" class="settings-restart-note" style="display:none">
@@ -5537,13 +5542,13 @@ function showSettings() {
             </div>
             <div class="settings-label" id="bgopacity-label" style="margin-top:14px"><span>Background opacity <span class="hint">(fades the Gradient background — UI &amp; text stay solid)</span></span><span class="val" id="s-bgopacity-val">${typeof s.bgOpacity === 'number' ? s.bgOpacity : 100}%</span></div>
             <input type="range" id="s-bgopacity" class="settings-slider" min="0" max="100" value="${typeof s.bgOpacity === 'number' ? s.bgOpacity : 100}" />
-            <div class="settings-label" id="clearop-label" style="margin-top:14px;display:none"><span>Background dim <span class="hint">(Acrylic / Clear — 0 = full desktop, higher = darker veil over the desktop; UI stays solid)</span></span><span class="val" id="s-clearop-val">${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}%</span></div>
+            <div class="settings-label" id="clearop-label" style="margin-top:14px;display:none"><span>Background dim <span class="hint">(Acrylic / Clear — 0 = pure desktop, higher = more of Glass's own background laid over it. This is also what the Blur slider frosts)</span></span><span class="val" id="s-clearop-val">${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}%</span></div>
             <input type="range" id="s-clearop" class="settings-slider" min="0" max="70" value="${typeof s.clearSeeThrough === 'number' ? s.clearSeeThrough : 0}" style="display:none" />
             <div class="settings-label" id="bgtrans-label" style="margin-top:14px;display:none"><span>Background transparency <span class="hint">(Acrylic / Clear — higher = the desktop shows through the background more, below the preset's default veil)</span></span><span class="val" id="s-bgtrans-val">${typeof s.bgTransparency === 'number' ? s.bgTransparency : 0}%</span></div>
             <input type="range" id="s-bgtrans" class="settings-slider" min="0" max="100" value="${typeof s.bgTransparency === 'number' ? s.bgTransparency : 0}" style="display:none" />
             <div class="settings-label" id="acrylicalpha-label" style="margin-top:14px;display:none"><span>UI transparency <span class="hint">(Acrylic / Clear — 0 = solid cards, higher = desktop shows through the UI cards too)</span></span><span class="val" id="s-acrylicalpha-val">${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}%</span></div>
             <input type="range" id="s-acrylicalpha" class="settings-slider" min="0" max="75" value="${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}" style="display:none" />
-            <div class="settings-label" id="acrylicblur-label" style="margin-top:14px;display:none"><span>Blur <span class="hint">(Acrylic / Clear — extra frost on the see-through cards; 0 = off)</span></span><span class="val" id="s-acrylicblur-val">${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}px</span></div>
+            <div class="settings-label" id="acrylicblur-label" style="margin-top:14px;display:none"><span>Blur <span class="hint">(Acrylic / Clear — frosts Glass's background through the see-through cards. Needs Background dim above 0 to have something to frost, and holds the background still while it's on. Can't frost the desktop itself — Windows won't blur behind a transparent window)</span></span><span class="val" id="s-acrylicblur-val">${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}px</span></div>
             <input type="range" id="s-acrylicblur" class="settings-slider" min="0" max="40" value="${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}" style="display:none" />
           </section>
         </div>
