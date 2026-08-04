@@ -292,16 +292,43 @@ body {
 :root[data-bgmode="clear"] .player-wrap {
   background-color: #000;
 }
-/* CRITICAL for these modes: kill ALL backdrop-filter by default. The
-   renderer-painted background is hidden (above), so blurring "what's behind"
-   a surface is pointless here — and a translucent + backdrop-blurred surface
-   sitting over the OS acrylic backdrop forces Chromium to re-rasterize that
-   whole stack every frame while scrolling/animating. That triple-composite
-   is exactly the "super glitchy" smearing/flicker. With it off, the
-   see-through comes purely from the OS backdrop showing through the empty
-   space + the tint alpha — composited once, smooth. */
-:root[data-bgmode="acrylic"] *,
-:root[data-bgmode="clear"] * {
+/* CRITICAL for these modes: kill backdrop-filter on the SCROLL-TIME surfaces.
+   The renderer-painted background is hidden (above), so blurring "what's
+   behind" one of these is pointless here — and a translucent +
+   backdrop-blurred surface sitting over the OS acrylic backdrop forces
+   Chromium to re-rasterize that whole stack every frame while
+   scrolling/animating. That triple-composite is exactly the "super glitchy"
+   smearing/flicker. With it off, the see-through comes purely from the OS
+   backdrop showing through the empty space + the tint alpha — composited
+   once, smooth.
+
+   This used to be a blanket `*`, which also killed the blur on every
+   TRANSIENT overlay — modals, popovers, context menus, banners, player
+   chrome. Those are static, short-lived, and sit over real in-page content
+   (which backdrop-filter CAN sample, unlike the desktop), so they cost
+   nothing at scroll time and the blur is what keeps them readable. The
+   blanket rule made the whole app read as flat the moment you picked a
+   see-through mode, and forced a hand-written `!important` re-enable for
+   each surface as it was noticed (.modal-card, .modal-bg, .cc-options-panel
+   below). Scoping the kill list instead lets every other surface keep its
+   own authored blur radius. */
+:root[data-bgmode="acrylic"] :is(.card, .shorts-card, .channel-row, .channel-info,
+  .channel-filter, .video-desc-wrap, .comments-list, .loadmore-btn, .dash-widget,
+  .dash-arrow, .dash-empty, .related-col, .comments-col, .titlebar),
+:root[data-bgmode="clear"] :is(.card, .shorts-card, .channel-row, .channel-info,
+  .channel-filter, .video-desc-wrap, .comments-list, .loadmore-btn, .dash-widget,
+  .dash-arrow, .dash-empty, .related-col, .comments-col, .titlebar),
+:root[data-bgmode="acrylic"] #search,
+:root[data-bgmode="clear"] #search {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Badges/rows nested INSIDE those scrolling surfaces — same re-raster cost.
+   Kept in a separate rule because these compound selectors would otherwise
+   raise the specificity of the whole :is() group above and outrank the
+   opt-in re-enable below. */
+:root[data-bgmode="acrylic"] :is(.card .thumb .duration, .shorts-thumb .duration, .related .row),
+:root[data-bgmode="clear"] :is(.card .thumb .duration, .shorts-thumb .duration, .related .row) {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
