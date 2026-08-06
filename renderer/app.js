@@ -838,6 +838,13 @@ async function getAvailableChannels() {
 
 // ---------- Routing ----------
 async function go(route, ...args) {
+  // The boot-time "Pick up where you left off" banner belongs to the home
+  // screen it appeared over. The #banner strip is in-flow, but the watch
+  // page's Up next rail is position:fixed — so a banner that survives
+  // navigation ends up sitting ON TOP of the rail's tabs. Any navigation
+  // the user makes themselves means they've moved on: dismiss it. Other
+  // banners (yt-dlp install prompt etc.) are deliberately left alone.
+  if (banner.querySelector('.resume-last-banner')) clearBanner();
   // Track history (skip when this call is itself a goBack pop)
   if (!navSuppressPush && currentNav && (currentNav.route !== route || JSON.stringify(currentNav.args) !== JSON.stringify(args))) {
     pushNav(currentNav);
@@ -3641,12 +3648,20 @@ async function renderChannel(id) {
     { key: 'oldest',  label: 'Oldest'  },
   ];
 
+  // yt-dlp's flat-playlist items carry NO timestamps (uploaded: 0) and often
+  // no view counts either, so a plain field sort compares all-equal values
+  // and visibly does nothing — the filters looked broken. Fall back to the
+  // fetch order, which both Piped and yt-dlp serve newest-first: 'latest' is
+  // that order, 'oldest' is it reversed, and 'popular' uses views when at
+  // least some items have them (ties keep fetch order for stability).
   const sortItems = (items, sort) => {
-    const arr = [...items];
-    if (sort === 'popular') arr.sort((a, b) => (b.views || 0) - (a.views || 0));
-    else if (sort === 'oldest') arr.sort((a, b) => (a.uploaded || 0) - (b.uploaded || 0));
-    else arr.sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0));
-    return arr;
+    const arr = items.map((it, i) => ({ it, i }));
+    const up = (x) => x.it.uploaded || 0;
+    const vw = (x) => x.it.views || 0;
+    if (sort === 'popular') arr.sort((a, b) => (vw(b) - vw(a)) || (a.i - b.i));
+    else if (sort === 'oldest') arr.sort((a, b) => (up(a) - up(b)) || (b.i - a.i));
+    else arr.sort((a, b) => (up(b) - up(a)) || (a.i - b.i));
+    return arr.map(x => x.it);
   };
 
   view.innerHTML = `

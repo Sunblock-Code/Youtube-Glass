@@ -5747,6 +5747,18 @@ body.dragging-panel * { cursor: grabbing !important; }
 /* --- Top banner (e.g. yt-dlp install prompt) --- */
 #banner:empty { display: none; }
 #banner { padding: 14px 28px 0; }
+/* On the watch page, keep the notification banner clear of the fixed Up next
+   rail on the right (rail = right:40px + var(--related-width)). Confines it to
+   the player/video area so it doesn't sit over the Up next tabs. Only when the
+   rail is expanded — collapsed leaves the banner full-width. */
+body:has(.player-page:not(.related-collapsed)) #banner {
+  padding-right: calc(var(--related-width, 380px) + 64px);
+}
+/* Collapsed rail still leaves a fixed slim strip on the right — keep the
+   banner clear of that too instead of overlapping its UP NEXT label. */
+body:has(.player-page.related-collapsed) #banner {
+  padding-right: 96px;
+}
 .install-banner {
   display: flex; align-items: center; gap: 16px;
   padding: 14px 18px;
