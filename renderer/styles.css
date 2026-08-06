@@ -165,6 +165,36 @@ body {
 :root[data-bgmode="solid"] .bg::after { display: none; }
 :root[data-bgmode="solid"] .blob { display: none; }
 
+/* Frosted mode (the Windhawk-friendly one): fake blur-behind. Nothing on
+   Win11 will blur the real desktop behind a transparent window (measured —
+   see main.js), and third-party DWM mods like Windhawk leave the see-through
+   modes as RAW sharp transparency. So Glass paints the WALLPAPER itself,
+   blurred in CSS, aligned 1:1 with the desktop behind the window (app.js
+   repositions it on every window move via the frost:bounds stream). Visually
+   it reads as real blur-behind wherever the desktop shows the wallpaper.
+   Card/veil styling is reused from Acrylic via the bgmode remap in app.js;
+   this layer just supplies the frosted backdrop underneath. */
+#frostbg {
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 0;               /* same layer as .bg; earlier sibling paints below */
+  overflow: hidden;
+  pointer-events: none;
+  background: #0a0612;      /* backstop while the wallpaper loads */
+}
+:root[data-frost="on"] #frostbg { display: block; }
+#frostbg .frost-img {
+  position: absolute;
+  /* The div is oversized by a pad on all sides (set in app.js) so the blur's
+     soft transparent edge falls OUTSIDE the window. background-size stays at
+     the display's real dimensions with background-position offset by the pad,
+     so alignment with the actual desktop is exact; `repeat` fills the pad so
+     the blur samples wallpaper-coloured pixels instead of a dark halo. */
+  background-repeat: repeat;
+  filter: blur(var(--frost-blur, 30px)) saturate(1.25);
+  will-change: left, top;
+}
+
 /* Acrylic (Win11 frosted OS backdrop) AND Clear (genuinely transparent
    window) modes both hide ALL renderer-painted background so the desktop
    shows through the empty space — blurred for acrylic, sharp for clear.

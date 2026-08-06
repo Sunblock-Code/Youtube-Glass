@@ -225,7 +225,13 @@ const DEFAULT_SETTINGS = {
   relatedWidth: 380,     // px — width of the Up next sidebar
   commentsPlacement: 'side',  // 'auto' | 'side' | 'below'  (default = always left)
   motion: 'subtle',   // 'still' | 'subtle' | 'lively'
-  bgMode: 'gradient', // 'gradient' | 'solid' | 'acrylic' | 'mica' | 'gaussian' | 'clear'
+  bgMode: 'gradient', // 'gradient' | 'solid' | 'acrylic' | 'mica' | 'gaussian' | 'clear' | 'frosted'
+  frostBlur: 30,      // px — Frosted mode only: how hard the wallpaper
+                      // stand-in behind the UI is blurred. This is OUR blur
+                      // (CSS filter on the wallpaper image Glass paints
+                      // itself), not an OS effect — so it keeps working when
+                      // a DWM mod (Windhawk etc.) breaks the OS acrylic path
+                      // and leaves the see-through modes raw transparency.
   bgSolidColor: '#0a0612',
   bgTint: 78,         // % — (legacy) was acrylic/clear surface tint; unused now.
   clearSeeThrough: 0, // % — "Background dim" veil over the desktop in
@@ -368,6 +374,43 @@ function applyTopbar(s) {
   });
 }
 
+// --- Frosted-mode wallpaper layer ------------------------------------------
+// Loads the user's wallpaper into #frostbg .frost-img and keeps it positioned
+// so it lines up EXACTLY with the desktop behind the window — main.js streams
+// window/display bounds on every move/resize. Combined with the CSS blur on
+// the layer, this fakes the blur-behind that no OS API (and no Windhawk-modded
+// DWM) will actually give a transparent window. Idempotent; called from
+// applySettings whenever bgMode is 'frosted'.
+let _frostReady = false;
+async function ensureFrostLayer() {
+  if (_frostReady) return;
+  const img = document.querySelector('#frostbg .frost-img');
+  if (!img || !window.app?.frost) return;
+  _frostReady = true;
+  // Oversize the div by PAD on all sides so the blur's soft edge lands
+  // outside the window; background-size/-position keep the wallpaper at the
+  // display's true scale and origin, so alignment stays exact (see CSS note).
+  const PAD = 96;
+  const place = (b) => {
+    if (!b || !b.display) return;
+    img.style.left   = (b.display.x - b.x - PAD) + 'px';
+    img.style.top    = (b.display.y - b.y - PAD) + 'px';
+    img.style.width  = (b.display.width  + PAD * 2) + 'px';
+    img.style.height = (b.display.height + PAD * 2) + 'px';
+    img.style.backgroundSize = b.display.width + 'px ' + b.display.height + 'px';
+    img.style.backgroundPosition = PAD + 'px ' + PAD + 'px';
+  };
+  window.app.frost.onBounds(place);
+  try {
+    const [wp, bounds] = await Promise.all([
+      window.app.frost.wallpaper(),
+      window.app.frost.getBounds(),
+    ]);
+    if (wp && wp.ok && wp.dataUrl) img.style.backgroundImage = `url("${wp.dataUrl}")`;
+    place(bounds);
+  } catch { /* wallpaper unreadable — the dark #frostbg backstop stays */ }
+}
+
 function applySettings(s) {
   const root = document.documentElement;
   const t = THEMES[s.theme] || THEMES.purple;
@@ -393,8 +436,19 @@ function applySettings(s) {
   // attribute to 'acrylic' — the real mode is still in s.bgMode for the
   // material call & pill highlight. Zero CSS duplication, so Acrylic's
   // working rules are untouched.
-  const cssBgMode = (s.bgMode === 'mica' || s.bgMode === 'gaussian') ? 'acrylic' : s.bgMode;
+  // Frosted joins the remap too: it reuses ALL of Acrylic's card/veil CSS and
+  // adds its own blurred-wallpaper layer underneath (data-frost + #frostbg).
+  const cssBgMode = (s.bgMode === 'mica' || s.bgMode === 'gaussian' || s.bgMode === 'frosted') ? 'acrylic' : s.bgMode;
   root.dataset.bgmode = ['solid', 'acrylic', 'clear'].includes(cssBgMode) ? cssBgMode : 'gradient';
+  // Frosted mode: show the blurred-wallpaper stand-in and set its blur. The
+  // layer itself is positioned/loaded by ensureFrostLayer (lazy — no cost for
+  // users who never touch the mode).
+  root.dataset.frost = s.bgMode === 'frosted' ? 'on' : 'off';
+  {
+    const fb = (typeof s.frostBlur === 'number') ? s.frostBlur : 30;
+    root.style.setProperty('--frost-blur', Math.min(80, Math.max(0, fb)) + 'px');
+  }
+  if (s.bgMode === 'frosted') ensureFrostLayer();
   // "Background dim": opacity of Glass's OWN background (gradient + blobs +
   // noise) laid over the desktop in the empty space ONLY. 0 = nothing (pure
   // sharp desktop), higher = progressively more of it. The UI surfaces stay
@@ -5535,6 +5589,7 @@ function showSettings() {
               <button class="theme-pill ${s.bgMode === 'mica' ? 'active' : ''}" data-bgmode="mica" title="Same as Acrylic but starts with Glass's background at 40% over the desktop — the most tinted of the three.">Mica</button>
               <button class="theme-pill ${s.bgMode === 'gaussian' ? 'active' : ''}" data-bgmode="gaussian" title="Same as Acrylic but starts with Glass's background at 20% over the desktop — a middle ground between Acrylic and Mica.">Gaussian</button>
               <button class="theme-pill ${s.bgMode === 'clear' ? 'active' : ''}" data-bgmode="clear" title="Transparent window — the real desktop shows SHARP in the empty areas, UI stays solid. Restart to toggle.">Clear glass</button>
+              <button class="theme-pill ${s.bgMode === 'frosted' ? 'active' : ''}" data-bgmode="frosted" title="Blurred-desktop look that doesn't rely on Windows at all — Glass paints your wallpaper, blurred, behind the UI and keeps it lined up with the real desktop. Use this when a DWM mod (Windhawk etc.) turns the other see-through modes into raw sharp transparency.">Frosted</button>
             </div>
             <div id="clear-restart-note" class="settings-restart-note" style="display:none">
               This see-through background needs a restart to take effect (the window must be recreated transparent).
@@ -5550,6 +5605,8 @@ function showSettings() {
             <input type="range" id="s-acrylicalpha" class="settings-slider" min="0" max="75" value="${typeof s.acrylicCardAlpha === 'number' ? s.acrylicCardAlpha : 0}" style="display:none" />
             <div class="settings-label" id="acrylicblur-label" style="margin-top:14px;display:none"><span>Blur <span class="hint">(Acrylic / Clear — frosts Glass's background through the see-through cards. Needs Background dim above 0 to have something to frost, and holds the background still while it's on. Can't frost the desktop itself — Windows won't blur behind a transparent window)</span></span><span class="val" id="s-acrylicblur-val">${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}px</span></div>
             <input type="range" id="s-acrylicblur" class="settings-slider" min="0" max="40" value="${typeof s.acrylicBlur === 'number' ? s.acrylicBlur : 0}" style="display:none" />
+            <div class="settings-label" id="frostblur-label" style="margin-top:14px;display:none"><span>Frost blur <span class="hint">(Frosted — how hard the wallpaper behind the UI is blurred. 0 = sharp wallpaper)</span></span><span class="val" id="s-frostblur-val">${typeof s.frostBlur === 'number' ? s.frostBlur : 30}px</span></div>
+            <input type="range" id="s-frostblur" class="settings-slider" min="0" max="80" value="${typeof s.frostBlur === 'number' ? s.frostBlur : 30}" style="display:none" />
           </section>
         </div>
 
@@ -5760,7 +5817,10 @@ function showSettings() {
     const seeThroughModes = ['acrylic', 'clear', 'mica', 'gaussian'];
     const wantTransparent = seeThroughModes.includes(mode);
     const note = modalBody.querySelector('#clear-restart-note');
-    if (note) note.style.display = (wantTransparent !== launchedTransparent) ? '' : 'none';
+    // Frosted needs no restart in either direction: its wallpaper layer is an
+    // opaque full-window backdrop, so it renders identically on a transparent
+    // or opaque window. (Next launch will still create the window opaque.)
+    if (note) note.style.display = (mode !== 'frosted' && wantTransparent !== launchedTransparent) ? '' : 'none';
     // Background opacity only does anything in Gradient mode (it fades the
     // gradient layer). In Solid it'd be a same-colour no-op; in Acrylic/
     // Clear there's no painted background. So only show it for Gradient —
@@ -5772,9 +5832,10 @@ function showSettings() {
     if (bgoInput) bgoInput.style.display = showBgo ? '' : 'none';
     // "Background dim" veil works in every see-through mode (Clear, Acrylic,
     // Mica, Gaussian) — they all share the .bg veil via the acrylic CSS.
+    // Frosted shares that CSS too (its blurred wallpaper sits under the veil).
     const coLabel = modalBody.querySelector('#clearop-label');
     const coInput = modalBody.querySelector('#s-clearop');
-    const showCo = ['clear', 'acrylic', 'mica', 'gaussian'].includes(mode);
+    const showCo = ['clear', 'acrylic', 'mica', 'gaussian', 'frosted'].includes(mode);
     if (coLabel) coLabel.style.display = showCo ? '' : 'none';
     if (coInput) coInput.style.display = showCo ? '' : 'none';
     // "Background transparency" — same see-through modes as the dim veil.
@@ -5792,6 +5853,11 @@ function showSettings() {
     const abInput = modalBody.querySelector('#s-acrylicblur');
     if (abLabel) abLabel.style.display = showCo ? '' : 'none';
     if (abInput) abInput.style.display = showCo ? '' : 'none';
+    // "Frost blur" — Frosted mode only: the blur on the wallpaper stand-in.
+    const fbLabel = modalBody.querySelector('#frostblur-label');
+    const fbInput = modalBody.querySelector('#s-frostblur');
+    if (fbLabel) fbLabel.style.display = (mode === 'frosted') ? '' : 'none';
+    if (fbInput) fbInput.style.display = (mode === 'frosted') ? '' : 'none';
   };
   modalBody.querySelectorAll('.theme-pill[data-bgmode]').forEach(btn => {
     btn.onclick = () => {
@@ -5858,6 +5924,18 @@ function showSettings() {
       if (acrylicBlurVal) acrylicBlurVal.textContent = v + 'px';
       setFill(acrylicBlurInput);
       update({ acrylicBlur: v });
+    };
+  }
+  // Frost blur: CSS blur strength on the Frosted mode's wallpaper stand-in.
+  const frostBlurInput = modalBody.querySelector('#s-frostblur');
+  const frostBlurVal   = modalBody.querySelector('#s-frostblur-val');
+  if (frostBlurInput) {
+    setFill(frostBlurInput);
+    frostBlurInput.oninput = () => {
+      const v = Number(frostBlurInput.value);
+      if (frostBlurVal) frostBlurVal.textContent = v + 'px';
+      setFill(frostBlurInput);
+      update({ frostBlur: v });
     };
   }
   const clearRestartBtn = modalBody.querySelector('#clear-restart-btn');

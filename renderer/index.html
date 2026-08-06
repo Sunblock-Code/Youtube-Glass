@@ -16,6 +16,12 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Frosted bg mode: blurred wallpaper stand-in, positioned by app.js to
+       line up with the desktop behind the window. Earlier sibling of .bg at
+       the same z-index, so the dim veil + cards stack over it. -->
+  <div id="frostbg" aria-hidden="true">
+    <div class="frost-img"></div>
+  </div>
   <div class="bg" aria-hidden="true">
     <div class="blob b1"></div>
     <div class="blob b2"></div>

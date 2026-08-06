@@ -113,6 +113,26 @@ function applyWindowCorners() {
 // CSS can't help either — backdrop-filter only samples what the page itself
 // painted, never the desktop behind the window. The only remaining route is
 // painting a desktopCapturer snapshot, blurred, as the app's own background.
+// --- "Frosted" background mode (Windhawk-friendly fake blur-behind) --------
+// Under third-party DWM mods (Windhawk's Translucent Windows / DWMBlurGlass
+// etc.) the see-through modes end up RAW transparency with no frost at all —
+// the mod owns the backdrop pipeline and our acrylic path does nothing. This
+// mode sidesteps the OS entirely: the renderer paints the user's WALLPAPER,
+// blurred with a CSS filter, as the app's own background, aligned 1:1 with
+// where the desktop actually is behind the window. Main's job is just (a)
+// handing over the wallpaper image and (b) streaming window/display bounds so
+// the layer stays glued to the desktop while the window moves. The default
+// Windows modes above are untouched — this is an additional option.
+function frostBoundsPayload() {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  const b = mainWindow.getBounds();
+  const d = screen.getDisplayMatching(b).bounds;
+  return { x: b.x, y: b.y, display: { x: d.x, y: d.y, width: d.width, height: d.height } };
+}
+function sendFrostBounds() {
+  const p = frostBoundsPayload();
+  if (p) mainWindow.webContents.send('frost:bounds', p);
+}
 
 // Tell the renderer whether the OS is handling the corners, so it can drop its
 // CSS-radius fallback (which would otherwise double-round against the region clip).
@@ -197,6 +217,15 @@ function createWindow() {
   mainWindow.on('resize', applyWindowCorners);
   mainWindow.on('maximize', applyWindowCorners);
   mainWindow.on('unmaximize', applyWindowCorners);
+
+  // Frosted-mode wallpaper alignment: stream bounds on every move/resize so
+  // the blurred wallpaper stand-in tracks the desktop behind the window.
+  // Tiny payloads (~100 bytes) at drag rate — cheap enough to send always
+  // rather than gate on the current bgMode.
+  mainWindow.on('move', sendFrostBounds);
+  mainWindow.on('resize', sendFrostBounds);
+  mainWindow.on('maximize', sendFrostBounds);
+  mainWindow.on('unmaximize', sendFrostBounds);
   mainWindow.webContents.on('did-finish-load', () => { applyWindowCorners(); sendNativeRoundingState(); });
 
   // The w2g WebContentsView is a child of this window's contentView, so it's
@@ -591,6 +620,36 @@ ipcMain.handle('window:set-rounded', (_e, rounded) => {
   sendNativeRoundingState();
   return { ok, native: nativeRoundingAvailable };
 });
+
+// Frosted mode: current wallpaper as a data: URL. The registry holds the
+// source path the user picked; the TranscodedWallpaper fallback is the file
+// Windows actually rendered (covers slideshow / picked-in-Settings cases
+// where the registry value is stale or extensionless).
+ipcMain.handle('frost:wallpaper', async () => {
+  const regPath = await new Promise(resolve => {
+    if (process.platform !== 'win32') return resolve(null);
+    require('child_process').execFile('reg', ['query', 'HKCU\\Control Panel\\Desktop', '/v', 'WallPaper'], (err, out) => {
+      const m = !err && out && out.match(/WallPaper\s+REG_SZ\s+(.+)/i);
+      resolve(m && m[1].trim() ? m[1].trim() : null);
+    });
+  });
+  const candidates = [
+    regPath,
+    path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Themes', 'TranscodedWallpaper'),
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      const buf = fs.readFileSync(p);
+      if (!buf.length) continue;
+      const ext = path.extname(p).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : ext === '.bmp' ? 'image/bmp'
+        : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      return { ok: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+    } catch {}
+  }
+  return { ok: false };
+});
+ipcMain.handle('frost:get-bounds', () => frostBoundsPayload());
 
 // Relaunch the app — used when the user toggles Clear-glass mode, since
 // `transparent` can only be set at window creation.

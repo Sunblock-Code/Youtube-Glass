@@ -49,7 +49,13 @@ const _initialTheme = _THEMES[_themeKey] || _THEMES.purple;
 // the ones that meaningfully affect the first-paint layout/colour.
 const _initialAttrs = {
   theme:    _themeKey,
-  bgmode:   _initialSettings && ['solid', 'acrylic'].includes(_initialSettings.bgMode) ? _initialSettings.bgMode : 'gradient',
+  // Frosted reuses acrylic's CSS (same remap app.js does) so the first paint
+  // already has the dark see-through card styling instead of a gradient flash.
+  bgmode:   _initialSettings && _initialSettings.bgMode === 'frosted' ? 'acrylic'
+    : _initialSettings && ['solid', 'acrylic'].includes(_initialSettings.bgMode) ? _initialSettings.bgMode : 'gradient',
+  // Show the frost backstop from the first frame in Frosted mode so there's
+  // no gradient/desktop flash before app.js loads the wallpaper layer.
+  frost:    _initialSettings && _initialSettings.bgMode === 'frosted' ? 'on' : 'off',
   material: (_initialSettings && _initialSettings.material) || 'none',
   motion:   (_initialSettings && _initialSettings.motion) || 'subtle',
 };
@@ -124,6 +130,18 @@ contextBridge.exposeInMainWorld('app', {
     setBounds:  (b)         => ipcRenderer.invoke('w2g:bounds', b),
     setVisible: (v)         => ipcRenderer.invoke('w2g:setVisible', v),
     close:      ()          => ipcRenderer.invoke('w2g:close'),
+  },
+  // "Frosted" bg mode: wallpaper image + live window/display bounds so the
+  // renderer can paint a blurred desktop stand-in that tracks window moves
+  // (the Windhawk-friendly blur path — see main.js frost handlers).
+  frost: {
+    wallpaper: () => ipcRenderer.invoke('frost:wallpaper'),
+    getBounds: () => ipcRenderer.invoke('frost:get-bounds'),
+    onBounds: (cb) => {
+      const handler = (_e, b) => cb(b);
+      ipcRenderer.on('frost:bounds', handler);
+      return () => ipcRenderer.removeListener('frost:bounds', handler);
+    },
   },
   setWindowOpacity: (v) => ipcRenderer.invoke('window:set-opacity', v),
   setWindowMaterial: (m) => ipcRenderer.invoke('window:set-material', m),

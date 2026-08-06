@@ -28,6 +28,7 @@
   const attrs = a.initialAttrs;
   if (attrs) {
     if (attrs.bgmode)   root.dataset.bgmode   = attrs.bgmode;
+    if (attrs.frost)    root.dataset.frost    = attrs.frost;
     if (attrs.material) root.dataset.material = attrs.material;
     if (attrs.motion)   root.dataset.motion   = attrs.motion;
   }
