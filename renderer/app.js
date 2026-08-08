@@ -595,6 +595,7 @@ const STATE_KEYS = [
   'panel-active-tab',     // Active tab when merged
   'merged-collapsed',     // Merged-mode collapsed
   'desc-mode',            // Description mode (raw / rich)
+  'desc-collapsed',       // Description panel open/shut
   'shorts-tab',           // Last-selected shorts tab
   'cc-volume',            // Last video volume
   'piped-display-name',   // Custom name for the topnav button
@@ -803,6 +804,7 @@ const DEFAULT_WIDGETS = {
   clock: true,
   recentHistory: true,
   quickLinks: false,
+  latest: true,     // "Recently added" bar across all dashboard channels
 };
 function getWidgets() {
   try { return { ...DEFAULT_WIDGETS, ...JSON.parse(localStorage.getItem('glass-widgets') || '{}') }; }
@@ -1323,6 +1325,7 @@ async function renderHomeDashboard() {
       <div id="dash-widget-toggles" class="dash-widget-toggles"></div>
     ` : ''}
     <div id="dash-widgets"></div>
+    <div id="dash-latest"></div>
     <div id="dash-rows"></div>
     ${dashboardEditing ? `
       <div style="display:flex;justify-content:center;margin-top:8px">
@@ -1414,9 +1417,24 @@ async function renderHomeDashboard() {
   // so we're not avatar-less while we wait on Piped).
   const persisted = getDashboard();
   let avatarsChanged = false;
+
+  // "Recently added" bar — one merged, newest-first strip of everything the
+  // dashboard channels have posted. Fed by the same per-channel fetches below
+  // (no extra requests) and re-rendered as each channel lands, so it fills in
+  // progressively instead of waiting on the slowest channel.
+  const latestBox = view.querySelector('#dash-latest');
+  const showLatest = getWidgets().latest !== false;
+  const latestPool = [];
+  let latestPending = dashboard.length;
+  if (latestBox && showLatest) renderLatestBar(latestBox, latestPool, latestPending);
+
   await Promise.all(dashboard.map(async (c) => {
     const container = rows.querySelector(`.dash-row-scroll[data-row-id="${CSS.escape(c.id)}"]`);
-    if (!container) return;
+    if (!container) {
+      latestPending--;
+      if (latestBox && showLatest) renderLatestBar(latestBox, latestPool, latestPending);
+      return;
+    }
     try {
       const ch = await api.channel(c.id);
 
@@ -1441,6 +1459,14 @@ async function renderHomeDashboard() {
           if (r?.ok && Array.isArray(r.items) && r.items.length) items = r.items;
         } catch { /* ignore — fall through to empty message */ }
       }
+      // Feed the merged bar. Piped's channel listing omits uploaderName (it's
+      // implied by the endpoint), so stamp it on — in the merged strip the
+      // channel is the whole point.
+      const chName = ch.name || c.name || c.id;
+      for (const it of items.slice(0, 8)) {
+        latestPool.push({ ...it, uploaderName: it.uploaderName || chName });
+      }
+
       if (!items.length) {
         container.innerHTML = `<div class="empty" style="padding:20px;flex:1">No videos.</div>`;
         return;
@@ -1452,9 +1478,92 @@ async function renderHomeDashboard() {
       attachRowScrollControls(container);
     } catch {
       container.innerHTML = `<div class="empty" style="padding:20px;flex:1;color:#fca5a5">Couldn't load this channel.</div>`;
+    } finally {
+      latestPending--;
+      if (latestBox && showLatest) renderLatestBar(latestBox, latestPool, latestPending);
     }
   }));
   if (avatarsChanged) setDashboard(persisted);
+}
+
+// The merged "Recently added" strip at the top of the dashboard: every video
+// from every featured channel, newest first. Re-entrant — called once per
+// channel as its fetch resolves, with `pending` counting channels still in
+// flight so the header can show progress and the empty state doesn't fire
+// before the last one lands.
+function renderLatestBar(box, pool, pending) {
+  // Newest first. yt-dlp's flat-playlist path returns uploaded: 0 (no
+  // timestamps), so those sink to the bottom rather than claiming 1970.
+  const seen = new Set();
+  const items = [];
+  for (const it of [...pool].sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0))) {
+    const vid = videoIdFromUrl(it.url || '');
+    if (!vid || seen.has(vid)) continue;
+    seen.add(vid);
+    items.push(it);
+    if (items.length >= 40) break;
+  }
+
+  const arrowSvg = (dir) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="${dir === 'left' ? '15 18 9 12 15 6' : '9 18 15 12 9 6'}"/></svg>`;
+
+  let body;
+  if (items.length) {
+    body = items.map(latestCard).join('');
+  } else if (pending > 0) {
+    body = `<div class="loader" style="padding:30px">Loading</div>`;
+  } else {
+    body = `<div class="empty" style="padding:20px;flex:1">Nothing new from your dashboard channels.</div>`;
+  }
+
+  box.innerHTML = `
+    <div class="dash-row dash-row-latest">
+      <div class="dash-row-header">
+        <div class="dash-latest-title">
+          <svg class="dash-latest-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>
+          </svg>
+          <span>Recently added</span>
+          <span class="dash-latest-count">${pending > 0 ? 'loading…' : `${items.length} video${items.length === 1 ? '' : 's'}`}</span>
+        </div>
+      </div>
+      <div class="dash-row-frame">
+        <button class="dash-arrow left"  aria-label="Scroll left">${arrowSvg('left')}</button>
+        <button class="dash-arrow right" aria-label="Scroll right">${arrowSvg('right')}</button>
+        <div class="dash-row-scroll">${body}</div>
+      </div>
+    </div>
+  `;
+
+  const scroll = box.querySelector('.dash-row-scroll');
+  scroll.querySelectorAll('.card').forEach(card => {
+    card.onclick = () => go('video', card.dataset.id);
+  });
+  // Arrows + drag-scroll only on the final pass. attachRowScrollControls binds
+  // window-level mousemove/mouseup, so wiring it on every intermediate render
+  // would stack one listener pair per channel. Native wheel/trackpad scrolling
+  // works meanwhile, and the arrows stay hidden until they're live.
+  if (items.length && pending <= 0) attachRowScrollControls(scroll);
+}
+
+// Card for the merged strip. Same shape as videoCard, but the subtitle leads
+// with the channel and carries the upload age — which channel posted what, and
+// how long ago, is the entire value of a cross-channel feed.
+function latestCard(item) {
+  const id = videoIdFromUrl(item.url);
+  const age = item.uploaded ? fmtRelative(item.uploaded) : '';
+  return `
+    <div class="card" data-id="${id}">
+      <div class="thumb">
+        <img src="${escapeAttr(item.thumbnail || '')}" loading="lazy" referrerpolicy="no-referrer" alt="" />
+        <div class="duration">${fmtDuration(item.duration)}</div>
+        ${watchProgressHtml(id)}
+      </div>
+      <div class="meta">
+        <div class="title">${escape(item.title || '')}</div>
+        <div class="sub"><span class="ch">${escape(item.uploaderName || '')}</span>${age ? `<span class="dot">·</span><span class="dash-latest-age">${escape(age)}</span>` : ''}</div>
+      </div>
+    </div>
+  `;
 }
 
 // Dashboard widgets — rendered as a grid of glass cards above the channel rows.
@@ -1574,6 +1683,7 @@ function renderWidgetToggles(container) {
   if (!container) return;
   const w = getWidgets();
   const items = [
+    { key: 'latest',        label: '🆕 Recently added',  sub: 'Newest across all dashboard channels' },
     { key: 'clock',         label: '🕓 Clock',           sub: 'Time, date, greeting' },
     { key: 'quickLinks',    label: '⚡ Quick links',     sub: 'Subs / Shorts / History buttons' },
     { key: 'recentHistory', label: '🎬 Recently watched', sub: 'Last 6 videos' },
@@ -1595,6 +1705,9 @@ function renderWidgetToggles(container) {
   container.querySelectorAll('input[data-widget-key]').forEach(cb => {
     cb.onchange = () => {
       patchWidgets({ [cb.dataset.widgetKey]: cb.checked });
+      // The Recently-added bar isn't a widget card — it needs the channel
+      // fetches to repopulate it, so re-run the whole dashboard for that one.
+      if (cb.dataset.widgetKey === 'latest') { renderDashboard(); return; }
       renderDashboardWidgets(view.querySelector('#dash-widgets'));
       cb.closest('.widget-toggle').classList.toggle('on', cb.checked);
     };
@@ -2504,6 +2617,18 @@ async function renderVideo(id) {
   const statsLine = statsParts.join('<span class="stat-sep" aria-hidden="true">·</span>');
 
   const descMode = localStorage.getItem('desc-mode') || 'raw';
+  // Description starts CLOSED. Most of a YouTube description is sponsor links
+  // and socials — it pushed the comments/player content down for no reason.
+  // Anything other than an explicit '0' (= user opened it before) stays shut.
+  const descCollapsed = localStorage.getItem('desc-collapsed') !== '0';
+  // One-line preview shown on the collapsed header so the bar isn't just the
+  // word "Description" — strip tags/newlines out of the raw HTML first.
+  const descPeek = (() => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = String(data.description || '').replace(/<br\s*\/?>/gi, ' ');
+    const t = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+    return t.length > 120 ? t.slice(0, 120) + '…' : t;
+  })();
 
   view.innerHTML = `
     <div class="player-page ${relatedCollapsed ? 'related-collapsed' : ''} ${commentsCollapsed ? 'comments-collapsed' : ''}">
@@ -2691,12 +2816,21 @@ async function renderVideo(id) {
               <span>${subbed ? 'Subscribed' : 'Subscribe'}</span>
             </button>
           </div>
-          <div class="video-desc-wrap">
-            <div class="desc-controls">
-              <button class="desc-toggle ${descMode === 'raw' ? 'active' : ''}" data-mode="raw">Raw</button>
-              <button class="desc-toggle ${descMode === 'rich' ? 'active' : ''}" data-mode="rich">Rendered</button>
+          <div class="video-desc-wrap ${descCollapsed ? 'desc-shut' : ''}" id="desc-wrap">
+            <button class="desc-head" id="desc-head" type="button" aria-expanded="${descCollapsed ? 'false' : 'true'}" aria-controls="desc-body">
+              <svg class="desc-head-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              <span class="desc-head-label">Description</span>
+              <span class="desc-head-peek">${escape(descPeek)}</span>
+            </button>
+            <div class="desc-body" id="desc-body">
+              <div class="desc-controls">
+                <button class="desc-toggle ${descMode === 'raw' ? 'active' : ''}" data-mode="raw">Raw</button>
+                <button class="desc-toggle ${descMode === 'rich' ? 'active' : ''}" data-mode="rich">Rendered</button>
+              </div>
+              <div class="video-desc" id="video-desc"></div>
             </div>
-            <div class="video-desc" id="video-desc"></div>
           </div>
         </div>
       </div>
@@ -2728,6 +2862,18 @@ async function renderVideo(id) {
         </div>
         </div>
       </div>
+      <!-- Always-present edge handle for bringing the Up next rail back. The
+           collapsed sliver is itself clickable, but it's easy to lose: it can
+           end up off-screen when the window is wider than the display, and the
+           auto-collapse-when-empty path hides it with no obvious way back.
+           This tab is fixed to the viewport's right edge, so it's reachable
+           regardless of what the grid does. -->
+      <button class="rail-peek" id="rail-peek" type="button" title="Show the Up next panel" aria-label="Show the Up next panel">
+        <svg class="rail-peek-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span class="rail-peek-label">Up next</span>
+      </button>
     </div>
   `;
 
@@ -2783,6 +2929,17 @@ async function renderVideo(id) {
       renderDesc(m);
     };
   });
+
+  // --- Description open/close ---
+  const descWrap = view.querySelector('#desc-wrap');
+  const descHead = view.querySelector('#desc-head');
+  if (descWrap && descHead) {
+    descHead.onclick = () => {
+      const shut = descWrap.classList.toggle('desc-shut');
+      descHead.setAttribute('aria-expanded', shut ? 'false' : 'true');
+      localStorage.setItem('desc-collapsed', shut ? '1' : '0');
+    };
+  }
 
   const v = view.querySelector('video');
   play(v, data);
@@ -3289,6 +3446,20 @@ async function renderVideo(id) {
     localStorage.setItem('related-collapsed', nowCollapsed ? '1' : '0');
     toggle.title = nowCollapsed ? 'Show sidebar' : 'Hide sidebar';
   };
+
+  // Edge handle → always re-opens the rail (never collapses it, so it can't
+  // become the thing that hid the panel in the first place).
+  const railPeek = view.querySelector('#rail-peek');
+  if (railPeek) {
+    railPeek.onclick = () => {
+      playerPage.classList.remove('related-collapsed');
+      localStorage.setItem('related-collapsed', '0');
+      toggle.title = 'Hide sidebar';
+      // An auto-collapse (empty Up next) would otherwise re-close the rail the
+      // moment the next fetch resolves. Opening it by hand takes ownership.
+      relatedAutoCollapsed = false;
+    };
+  }
 
   const commentsToggle = view.querySelector('#comments-toggle');
   if (commentsToggle) {
