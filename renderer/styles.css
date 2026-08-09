@@ -1487,10 +1487,17 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
 }
 .player-page.related-collapsed .rail-peek { display: flex; }
 .rail-peek:hover { color: var(--text); }
-/* Stack the caption vertically so it fits the slim sliver. */
+/* Stack the caption vertically so it fits the slim sliver. Rotated 180° on top
+   of vertical-rl so it reads BOTTOM-TO-TOP (glyphs turned counter-clockwise) —
+   the usual direction for a right-edge tab, and the way the eye travels back
+   toward the panel it opens. nowrap + line-height:1 keep the caption one clean
+   column instead of letting it break across the 44px sliver. */
 .rail-peek-label {
   writing-mode: vertical-rl;
   text-orientation: mixed;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  line-height: 1;
 }
 .rail-peek-chevron { flex-shrink: 0; }
 /* The sliver's own centred chevron would collide with the tab's — the tab
@@ -3373,8 +3380,11 @@ input[type="checkbox"].glass-check:checked::after {
 /* Tab bar shown only inside the host panel when merged */
 .panel-tab-bar {
   display: none;
-  gap: 4px;
-  padding: 0 0 12px;
+  /* No gutter between the tabs — the active pill then runs flush to the bar's
+     edges and to its neighbour, reading as one segmented control instead of a
+     chip floating in the middle of its half. */
+  gap: 0;
+  padding: 0 0 10px;
   border-bottom: 1px solid var(--glass-border);
   margin-bottom: 12px;
   align-items: center;
@@ -4960,6 +4970,9 @@ body.dragging-panel * { cursor: grabbing !important; }
 .desc-head {
   display: flex;
   align-items: center;
+  /* Centred group (chevron + DESCRIPTION + preview) rather than left-anchored —
+     the bar is full-width, so a left-hugging label left a dead right half. */
+  justify-content: center;
   gap: 8px;
   width: 100%;
   padding: 11px 14px;
@@ -4967,14 +4980,14 @@ body.dragging-panel * { cursor: grabbing !important; }
   border: none;
   color: var(--text);
   font: inherit;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 .desc-head:hover { background: var(--glass); }
 .desc-head-chevron {
   flex-shrink: 0;
-  color: var(--muted);
+  color: var(--text);
   transform: rotate(90deg);          /* open → points down */
   transition: transform 0.2s ease;
 }
@@ -4985,16 +4998,18 @@ body.dragging-panel * { cursor: grabbing !important; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--muted);
+  color: var(--text);
 }
 /* First line of the description, shown only while closed — turns the bar into
-   a preview instead of a blank label. */
+   a preview instead of a blank label. flex:0 1 auto (not 1) so it only takes
+   the room it needs and the whole group stays centred; it still ellipsizes
+   once the title outgrows the bar. */
 .desc-head-peek {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 12px;
-  color: var(--muted);
-  opacity: 0.75;
+  color: var(--text);
+  opacity: 0.92;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
