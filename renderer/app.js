@@ -1523,7 +1523,7 @@ function renderLatestBar(box, pool, pending) {
             <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>
           </svg>
           <span>Recently added</span>
-          <span class="dash-latest-count">${pending > 0 ? 'loading…' : `${items.length} video${items.length === 1 ? '' : 's'}`}</span>
+          <span class="dash-latest-count">${pending > 0 ? 'loading…' : `${items.length} Video${items.length === 1 ? '' : 's'}`}</span>
         </div>
       </div>
       <div class="dash-row-frame">

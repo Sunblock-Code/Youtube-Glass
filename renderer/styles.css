@@ -2544,7 +2544,10 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
   text-transform: none;
   color: var(--muted);
   padding: 2px 9px;
-  border-radius: 999px;
+  /* Soft square, not a full pill — 999px made it read as a status chip next
+     to the uppercase widget title. A small radius sits in the same family as
+     the cards and buttons around it. */
+  border-radius: 7px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
 }
@@ -6063,26 +6066,33 @@ body:has(.player-page.related-collapsed) #banner {
   transform: translateY(-1px);
 }
 .resume-actions button:active { transform: translateY(0) scale(0.97); }
-/* Continue — vivid gradient fill with a moving sheen on hover. The bg uses
-   background-clip:padding-box so no transparent-border seam shows. A pseudo
-   sheen sweeps across at 1.6s on hover. Layered glow shadow for depth. */
+/* Continue — solid purple gradient fill with a moving sheen on hover. Two
+   deliberate choices here:
+   1. Purple, not pink/orange. The old ramp ran accent → #ec4899 → #f97316 and
+      landed as a magenta chip sitting in an otherwise purple UI.
+   2. No wide accent-coloured drop shadow. At 18px blur it haloed the button,
+      so the eye read a fuzzy glowing outline instead of a filled shape. Depth
+      now comes from a crisp 1px inset ring + a tight neutral shadow, which
+      keeps the edge sharp against the banner.
+   overflow:hidden clips the sheen to the radius so the silhouette stays clean.
+   A pseudo sheen sweeps across at 1.6s on hover. */
 .resume-actions button.primary {
   position: relative;
   border: none;
   background:
-    linear-gradient(135deg, var(--accent) 0%, #ec4899 60%, #f97316 120%);
+    linear-gradient(135deg, var(--accent) 0%, #9333ea 50%, #6d28d9 100%);
   background-size: 200% 100%;
   background-position: 0% 50%;
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.4px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
   overflow: hidden;
   isolation: isolate;
   box-shadow:
-    0 6px 18px rgba(var(--accent-rgb), 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-    0 1px 0 rgba(255, 255, 255, 0.30) inset;
+    0 0 0 1px rgba(255, 255, 255, 0.16) inset,
+    0 1px 0 rgba(255, 255, 255, 0.26) inset,
+    0 2px 6px rgba(0, 0, 0, 0.30);
   transition: background-position 0.5s ease, box-shadow 0.25s ease,
               transform 0.12s ease, filter 0.15s ease;
 }
@@ -6111,9 +6121,9 @@ body:has(.player-page.related-collapsed) #banner {
   background-position: 100% 50%;
   transform: translateY(-1px);
   box-shadow:
-    0 10px 26px rgba(var(--accent-rgb), 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.10) inset,
-    0 1px 0 rgba(255, 255, 255, 0.34) inset;
+    0 0 0 1px rgba(255, 255, 255, 0.22) inset,
+    0 1px 0 rgba(255, 255, 255, 0.32) inset,
+    0 4px 10px rgba(0, 0, 0, 0.34);
 }
 .resume-actions button.primary:hover::before {
   opacity: 1;
@@ -6127,8 +6137,8 @@ body:has(.player-page.related-collapsed) #banner {
   transform: translateY(0) scale(0.97);
   filter: brightness(0.95);
   box-shadow:
-    0 3px 10px rgba(var(--accent-rgb), 0.45),
-    inset 0 2px 5px rgba(0, 0, 0, 0.18);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 2px 5px rgba(0, 0, 0, 0.22);
 }
 
 
