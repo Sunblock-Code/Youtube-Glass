@@ -7023,8 +7023,7 @@ function showWatchPartyStart() {
   // a helpful placeholder.
   const savedName = localStorage.getItem('wp-name') || '';
   openModal(`
-    <h2 data-wp-modal>Watch together</h2>
-    <div class="modal-sub">Sync with friends in Glass, or open a Watch2Gether room docked in the UI.</div>
+    <h2 class="modal-titlebar" data-wp-modal>Watch together</h2>
 
     <div class="wp-tabs" role="tablist" aria-label="Watch together mode">
       <button class="wp-tab active" data-wp-tab="sync" role="tab" aria-selected="true">Glass Sync</button>
@@ -7259,8 +7258,7 @@ function showWatchPartyRoom() {
   const count = watchParty.peerCount;
   const total = count + 1;
   openModal(`
-    <h2 data-wp-modal>Watch together</h2>
-    <div class="modal-sub">${watchParty.isHost ? "You started this room." : "You joined a room."}</div>
+    <h2 class="modal-titlebar" data-wp-modal>Watch together<span class="modal-titlebar-note">${watchParty.isHost ? "You started this room" : "You joined a room"}</span></h2>
     <div class="wp-code-block">
       <div class="wp-code-label">Room code</div>
       <div class="wp-code">${escape(code)}</div>

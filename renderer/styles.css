@@ -7183,6 +7183,98 @@ body:has(.player-page.related-collapsed) #banner {
   margin-top: 0;
 }
 
+/* ============================================================
+   Watch together — flush title bar
+   ============================================================
+   The header used to be a bare <h2> floating on the card padding with a
+   grey `.modal-sub` line under it that only restated what the two action
+   cards already say. The title now sits in a bar that bleeds to the card
+   edges — the negative margins cancel `.modal-card`'s 28px padding — so
+   it reads as a window chrome strip instead of drifting text. Only the
+   in-room view keeps a note (host vs. guest), inlined into the bar. */
+.modal .modal-titlebar {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: -28px -28px 0;
+  /* Right padding clears the ✕ that openModal() prepends into the body. */
+  padding: 16px 58px 15px 24px;
+  border-radius: 19px 19px 0 0;   /* card radius (20) minus its 1px border */
+  border-bottom: 1px solid var(--glass-border-strong);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+.modal .modal-titlebar .modal-titlebar-note {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--text);
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Centre the ✕ in the bar rather than leaving it in the card corner. */
+.modal-card:has(.modal-titlebar) .modal-close-x { top: 12px; right: 14px; }
+
+/* ============================================================
+   Watch together — legibility of the Join a room controls
+   ============================================================
+   Two things in this card were effectively unreadable:
+
+   1. The "ABCDEF" placeholder was --muted at 0.45 alpha over glass —
+      about 3:1 against the card. Switched to the body text colour at a
+      higher alpha, and matched to the typed value's 6px tracking so the
+      hint and real input share the same rhythm.
+   2. "Join" was #fff on a raw var(--accent). The default accent is a
+      light lilac (#c084fc), so white-on-accent landed near 2:1. Mixing
+      the accent toward near-black before painting keeps the button
+      recognisably accent-coloured while pushing white past 4.5:1 — and
+      it holds for any accent the theme picker produces, which a fixed
+      dark foreground would not. */
+/* Alpha is baked into the colour rather than set via `opacity` — Chromium
+   honours both on ::placeholder, but only the colour form is reliably
+   readable back out of getComputedStyle, which makes this verifiable. */
+.modal .wp-join-form input::placeholder {
+  color: color-mix(in srgb, var(--text) 52%, transparent);
+  opacity: 1;
+  font-weight: 700;
+  letter-spacing: 6px;
+}
+.wp-join-form .modal-btn.primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 70%, #120d1c),
+    color-mix(in srgb, var(--accent) 52%, #120d1c)
+  );
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  font-size: 15px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.28);
+}
+.wp-join-form .modal-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb), 0.40);
+}
+/* Card titles + subtitles. The subtitles' problem was mostly size — 12px
+   with a tight default leading — so they grow first; swapping --muted for
+   --text at 0.86 alpha lifts them 9.2:1 → 10.8:1 against the card without
+   making them shout over the 15px title. Both watch-together cards are
+   listed so Start and Join stay typographically identical; the account
+   modal's `.auth-card`s are deliberately left alone. */
+#wp-start .auth-text strong,
+.wp-join-card .auth-text strong { font-size: 15px; }
+#wp-start .auth-text span,
+.wp-join-card .auth-text span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+}
+
 /* --- Direct media URL player ---------------------------------------------
    A pasted .mp4 / .webm / .m3u8 / .mpd link plays here with native controls.
    Reuses the .player-wrap frame (rounded 16:9 black box) but lets arbitrary
