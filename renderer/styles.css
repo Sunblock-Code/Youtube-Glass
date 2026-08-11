@@ -1686,6 +1686,24 @@ main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); bac
     overscroll-behavior: contain;
   }
 }
+/* Same medicine for AUTO mode's below-the-player column (the default layout
+   at ≤1700px). It left the list at `overflow-y: visible`, so the comment
+   rows lived in the PAGE's scroll box: scrolling carried them up past the
+   pinned tabs/header, and they were painted in the strip ABOVE the panel —
+   comment text floating over the page above the block's rounded top edge.
+   Giving the list its own scroll box means a row cannot exist outside it,
+   so nothing shows above the header at any scroll position. (Forced
+   "below" mode never had the bug — its column is overflow:hidden.)
+   Scoped ≥1101px so the narrow-dock layouts, which deliberately stack
+   everything into one page-scrolling column, are untouched. */
+@media (min-width: 1101px) and (max-width: 1700px) {
+  :root[data-comments="auto"] .player-page > .comments-col .comments-list {
+    overflow-y: auto;
+    min-height: 0;
+    max-height: 68vh;
+    overscroll-behavior: contain;
+  }
+}
 :root[data-comments="side"] .player-page.comments-collapsed .comments-header {
   justify-content: center;
 }
@@ -4970,9 +4988,10 @@ body.dragging-panel * { cursor: grabbing !important; }
 .desc-head {
   display: flex;
   align-items: center;
-  /* Centred group (chevron + DESCRIPTION + preview) rather than left-anchored —
-     the bar is full-width, so a left-hugging label left a dead right half. */
-  justify-content: center;
+  /* Left-anchored: the chevron and the DESCRIPTION label sit at the start of
+     the bar, in line with the title / channel row above, instead of floating
+     in the middle of a full-width bar. */
+  justify-content: flex-start;
   gap: 8px;
   width: 100%;
   padding: 11px 14px;
@@ -4980,7 +4999,7 @@ body.dragging-panel * { cursor: grabbing !important; }
   border: none;
   color: var(--text);
   font: inherit;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -5001,9 +5020,9 @@ body.dragging-panel * { cursor: grabbing !important; }
   color: var(--text);
 }
 /* First line of the description, shown only while closed — turns the bar into
-   a preview instead of a blank label. flex:0 1 auto (not 1) so it only takes
-   the room it needs and the whole group stays centred; it still ellipsizes
-   once the title outgrows the bar. */
+   a preview instead of a blank label. OFF by default (Settings → "Preview the
+   description on the closed bar"): the bar is just the chevron + label, and
+   you only see description text once you actually open it. */
 .desc-head-peek {
   flex: 0 1 auto;
   min-width: 0;
@@ -5015,6 +5034,9 @@ body.dragging-panel * { cursor: grabbing !important; }
   text-overflow: ellipsis;
 }
 .video-desc-wrap:not(.desc-shut) .desc-head-peek { display: none; }
+/* Default off — applySettings() flips this to "on" when the setting is
+   enabled, so toggling it applies live without re-rendering the page. */
+:root:not([data-descpeek="on"]) .desc-head-peek { display: none; }
 .video-desc-wrap.desc-shut .desc-body { display: none; }
 
 .desc-controls {
@@ -5047,8 +5069,10 @@ body.dragging-panel * { cursor: grabbing !important; }
 .video-desc {
   padding: 8px 16px 14px;
   white-space: pre-wrap;
-  font-size: 13px;
-  line-height: 1.55;
+  /* Bumped from 13px — the description was noticeably smaller than the
+     comment text sitting next to it and was a strain to read. */
+  font-size: 14.5px;
+  line-height: 1.6;
   color: #d4cce8;
   max-height: 240px;
   overflow-y: auto;

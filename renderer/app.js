@@ -213,6 +213,7 @@ const DEFAULT_SETTINGS = {
   windowOpacity: 100, // %  — opacity of the entire window (everything translucent)
   askResume: true,
   showLikes: false,
+  showDescPeek: false, // preview the description's first line on the closed bar
   hideScrollbars: false,
   hideDonateButton: false,
   searchStyle: 'pill',   // 'pill' | 'square'
@@ -506,6 +507,10 @@ function applySettings(s) {
   root.dataset.topnav = ['text', 'icon', 'both'].includes(s.topnavStyle) ? s.topnavStyle : 'text';
   applyTopbar(s); // order + on/off of every top-bar element (Settings → Buttons)
   root.dataset.heatmap = s.showHeatmap === false ? 'off' : 'on';
+  // Description bar: show the first line as a preview, or just the label.
+  // CSS-driven (:root[data-descpeek=on]) so the toggle applies live to an
+  // already-open watch page instead of needing a re-render.
+  root.dataset.descpeek = s.showDescPeek ? 'on' : 'off';
   root.dataset.subsBelow = s.subtitlesBelow ? '1' : ''; // captions: box below video vs on-video overlay
   root.style.setProperty('--related-width', (s.relatedWidth || 380) + 'px');
   root.dataset.comments = s.commentsPlacement || 'auto';
@@ -839,7 +844,17 @@ async function getAvailableChannels() {
 }
 
 // ---------- Routing ----------
+// Every go() bumps this generation counter. Async renderers capture it up
+// front and bail the moment it moves, because a render is NOT atomic: a cold
+// `yt-dlp -j` takes 5-8 s, so a slow first click could still be awaiting when
+// the user gave up and opened something else. The stale call would then wake
+// up, blow away `view`, and start playing ITS video over the one already
+// running — the "a few seconds in, it switches to a different video" bug.
+let navGen = 0;
+const navStale = (gen) => gen !== navGen;
+
 async function go(route, ...args) {
+  const gen = ++navGen;
   // The boot-time "Pick up where you left off" banner belongs to the home
   // screen it appeared over. The #banner strip is in-flow, but the watch
   // page's Up next rail is position:fixed — so a banner that survives
@@ -890,7 +905,7 @@ async function go(route, ...args) {
   try {
     if (route === 'home')         await renderDashboard();
     else if (route === 'search')  await renderSearch(args[0]);
-    else if (route === 'video')   await renderVideo(args[0]);
+    else if (route === 'video')   await renderVideo(args[0], gen);
     else if (route === 'url')     await renderDirectUrl(args[0]);
     else if (route === 'w2g')     await renderW2G(args[0]);
     else if (route === 'subs')    await renderSubs();
@@ -2586,8 +2601,12 @@ async function renderW2G(url) {
   window.addEventListener('resize', sync);
 }
 
-async function renderVideo(id) {
+async function renderVideo(id, gen = navGen) {
   const { data, source } = await fetchVideoData(id);
+  // The fetch above can take seconds. If the user navigated away in the
+  // meantime, drop everything on the floor — writing `view` now would replace
+  // whatever they're actually watching with this stale video.
+  if (navStale(gen)) return;
   const channelId = channelIdFromUrl(data.uploaderUrl);
   recordWatch({
     id,
@@ -3469,12 +3488,12 @@ async function renderVideo(id) {
       commentsToggle.title = nowCollapsed ? 'Show comments' : 'Hide comments';
       // Lazy-load comments the first time the user expands the panel
       if (!nowCollapsed && !view.dataset.commentsLoaded) {
-        loadComments(id);
+        loadComments(id, gen);
       }
     };
   }
   // If the user starts with comments expanded, kick off the fetch immediately
-  if (!commentsCollapsed) loadComments(id);
+  if (!commentsCollapsed) loadComments(id, gen);
 
   // ---- Comment composer ----
   // If the user is signed in to Google with the comment scope, posts go
@@ -4201,12 +4220,16 @@ function renderCommentList(items, list, sort) {
   });
 }
 
-async function loadComments(videoId) {
+async function loadComments(videoId, gen = navGen) {
   const list = view.querySelector('#comments-list');
   if (!list) return;
   view.dataset.commentsLoaded = '1';
   try {
     const data = await api.comments(videoId);
+    // Navigated away while the comments were in flight — `list` is a detached
+    // node now, and the filter-pill rebind below would wire the NEW page's
+    // pills to this dead list.
+    if (navStale(gen)) return;
     const items = data?.comments || [];
     if (!items.length) {
       list.innerHTML = `<div class="empty" style="padding:30px">No comments.</div>`;
@@ -5808,6 +5831,10 @@ function showSettings() {
               Show likes count on watch page
             </label>
             <label class="check-row">
+              <input type="checkbox" id="s-descpeek" ${s.showDescPeek ? 'checked' : ''} class="glass-check" />
+              Preview the description on the closed bar — off means you only see it once you open it
+            </label>
+            <label class="check-row">
               <input type="checkbox" id="s-hidebars" ${s.hideScrollbars ? 'checked' : ''} class="glass-check" />
               Hide scrollbars
             </label>
@@ -6134,6 +6161,9 @@ function showSettings() {
   };
   modalBody.querySelector('#s-likes').onchange = (e) => {
     update({ showLikes: e.target.checked });
+  };
+  modalBody.querySelector('#s-descpeek').onchange = (e) => {
+    update({ showDescPeek: e.target.checked });
   };
   modalBody.querySelector('#s-hidebars').onchange = (e) => {
     update({ hideScrollbars: e.target.checked });
